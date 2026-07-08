@@ -1,0 +1,41 @@
+# xeXamEnumerate async return -> X_ERROR_IO_PENDING
+#
+# Source: src/kernel/xam/xam_enum.cpp lines 65-76
+#
+# Problem:
+#   Spider-Man 3's save-system enumeration calls xeXamEnumerate with an
+#   overlapped struct (async path). The game's async poll loop expects the
+#   function to return X_ERROR_IO_PENDING and then later complete the
+#   overlapped with the real result. If the function returns X_ERROR_SUCCESS
+#   (or any synchronous result) from the overlapped branch, the poll loop
+#   never enters its wait state and the save system hangs on the first
+#   enumeration.
+#
+# Fix:
+#   In the `else if (overlapped_ptr)` branch, run the enumeration, complete
+#   the overlapped immediately (CompleteOverlappedImmediateEx) with the
+#   real result, and return X_ERROR_IO_PENDING so the caller enters its
+#   async wait. The overlapped is completed inline because the result is
+#   already known - the IO_PENDING return is the protocol the game expects,
+#   not an indication of deferred work.
+#
+# This is a game-runtime patch (opt-in per game; required for SM3 saves).
+# Game ID 415607E2 = Spider-Man 3 (Xbox 360) title ID.
+#
+# NOTE: the shipped SDK source tree is ALREADY fixed (line 71 returns
+# X_ERROR_IO_PENDING). On the shipped tree the search string (return result;)
+# will NOT match in the overlapped branch and the apply stage reports
+# "already applied". On a pristine upstream SDK drop that returned the
+# synchronous result from the overlapped branch, the search matches and the
+# replace installs the fix.
+
+[patch]
+id = "runtime/xam-enum-pending"
+category = "game-runtime"
+file = "src/kernel/xam/xam_enum.cpp"
+# Pristine upstream: the overlapped branch returns the synchronous run()
+# result instead of X_ERROR_IO_PENDING. The game's async poll loop never
+# enters its wait state -> save system hangs. Fix: complete the overlapped
+# inline (already done on the line above) and return IO_PENDING.
+search = "    REX_KERNEL_STATE()->CompleteOverlappedImmediateEx(overlapped_ptr, result, extended_error, length);\n    return result;"
+replace = "    REX_KERNEL_STATE()->CompleteOverlappedImmediateEx(overlapped_ptr, result, extended_error, length);\n    return X_ERROR_IO_PENDING;"

@@ -1,0 +1,51 @@
+# EDRAM ROV barrier skip
+#
+# Source: src/graphics/d3d12/render_target_cache.cpp lines 1088-1094
+#
+# Problem:
+#   In the PixelShaderInterlock (ROV) render path, Update() unconditionally
+#   called MarkEdramBufferModified(kAsROV) on every draw, which inserts a UAV
+#   barrier on the EDRAM buffer. For draw calls that write neither color nor
+#   depth/stencil (e.g. depth-only passes with depth-test-but-no-write,
+#   occlusion queries with no color output), this barrier is pure overhead -
+#   it forces the GPU to drain the pipeline for a buffer that was not modified
+#   by that draw.
+#
+# Fix:
+#   Gate the MarkEdramBufferModified() call on the draw actually writing
+#   something:
+#     if (normalized_color_mask != 0 ||
+#         normalized_depth_control.z_write_enable ||
+#         normalized_depth_control.stencil_enable) {
+#       MarkEdramBufferModified(EdramBufferModificationStatus::kAsROV);
+#     }
+#
+#   This skips useless UAV barriers on read-only draws. On Spider-Man 3's ROV
+#   path this is a measurable FPS-min win (part of the 23 -> 30+ minimums
+#   improvement alongside kQueueFrames=2).
+#
+# This is a general-runtime patch: any ROV-path game benefits from not
+# barrier-ing on read-only draws.
+#
+# NOTE: the shipped SDK source tree is ALREADY fixed (lines 1088-1094 contain
+# the guarded if-block). On the shipped tree the search string (the
+# unconditional form) will NOT match and the apply stage reports
+# "already applied". On a pristine upstream SDK drop, the search matches the
+# unconditional call and the replace installs the guard.
+
+[patch]
+id = "runtime/rov-barrier-skip"
+category = "general-runtime"
+file = "src/graphics/d3d12/render_target_cache.cpp"
+# Pristine upstream: unconditionally marks the EDRAM buffer modified after
+# the UAV commit, inserting a barrier on EVERY draw regardless of whether it
+# wrote color or depth. Fix: gate on the draw actually writing something.
+search = "      CommitEdramBufferUAVWrites(EdramBufferModificationStatus::kAsUAV);\n      MarkEdramBufferModified(EdramBufferModificationStatus::kAsROV);"
+replace = """      CommitEdramBufferUAVWrites(EdramBufferModificationStatus::kAsUAV);
+      // SPIDERMAN3-BUILDER-PATCH: rov-barrier-skip
+      // Skip the EDRAM barrier if this draw writes neither color nor
+      // depth/stencil - prevents useless UAV barriers on read-only draws.
+      if (normalized_color_mask != 0 || normalized_depth_control.z_write_enable ||
+          normalized_depth_control.stencil_enable) {
+        MarkEdramBufferModified(EdramBufferModificationStatus::kAsROV);
+      }"""

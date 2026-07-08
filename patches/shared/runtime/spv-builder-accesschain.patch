@@ -1,0 +1,6 @@
+[patch]
+id = "runtime/spv-builder-accesschain"
+category = "general-runtime"
+file = "thirdparty/glslang/SPIRV/SpvBuilder.cpp"
+search = "Id Builder::createAccessChain(StorageClass storageClass, Id base, const std::vector<Id>& offsets)\n{\n    // Figure out the final resulting type.\n    Id typeId = getResultingAccessChainType();\n    typeId = makePointer(storageClass, typeId);"
+replace = "Id Builder::createAccessChain(StorageClass storageClass, Id base, const std::vector<Id>& offsets)\n{\n    // Figure out the final resulting type.\n    // getResultingAccessChainType reads from accessChain member state, but the SDK\n    // calls this overload directly without setting accessChain. Save/restore state.\n    Id savedBase = accessChain.base;\n    std::vector<Id> savedIndexChain = accessChain.indexChain;\n    accessChain.base = base;\n    accessChain.indexChain = offsets;\n    Id typeId = getResultingAccessChainType();\n    accessChain.base = savedBase;\n    accessChain.indexChain = savedIndexChain;\n    typeId = makePointer(storageClass, typeId);"

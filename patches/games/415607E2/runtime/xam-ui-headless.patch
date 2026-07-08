@@ -1,0 +1,58 @@
+# xeXamDispatchHeadless with XN_SYS_UI notifications
+#
+# Source: src/kernel/xam/xam_ui.cpp lines 161-180
+#
+# Problem:
+#   Spider-Man 3's save UI is driven through xeXamDispatchHeadless. The
+#   pristine upstream xeXamDispatchHeadless, in the async (overlapped)
+#   branch, simply deferred the run_callback with a bare
+#   CompleteOverlappedDeferred(run_callback, overlapped) - no pre/post
+#   notifications. The game's UI thread waits for an XN_SYS_UI notification
+#   (notification ID 0x9) to know when the UI overlay is about to appear and
+#   when it has dismissed. Without those notifications, the game's UI state
+#   machine never transitions out of its wait state and the save dialog
+#   appears to hang (or the game proceeds without ever dismissing the
+#   overlay).
+#
+# Fix:
+#   In the async branch, wrap the deferred callback with pre/post lambdas:
+#     pre  -> BroadcastNotification(0x9, true)   (XN_SYS_UI = true)
+#     post -> Sleep(100ms); BroadcastNotification(0x9, false) (XN_SYS_UI = false)
+#   The 100ms sleep gives the UI thread time to process the true notification
+#   before the false (dismiss) arrives, matching the timing the game expects
+#   from real Xbox 360 hardware.
+#
+# The shipped SDK source already contains this fix (lines 161-180). This
+# patch is idempotent: on the shipped tree the search string (the bare
+# deferred call without pre/post) will NOT match and the apply stage
+# reports "already applied". On a pristine upstream drop with the bare
+# deferred call, the search matches and the replace installs the pre/post
+# notifications.
+#
+# Game-runtime patch (opt-in per game; required for SM3 saves).
+# Game ID 415607E2 = Spider-Man 3.
+
+[patch]
+id = "runtime/xam-ui-headless"
+category = "game-runtime"
+file = "src/kernel/xam/xam_ui.cpp"
+# Pristine upstream: the async branch defers the callback with no pre/post
+# notifications. The game's UI state machine hangs waiting for XN_SYS_UI.
+# Fix: wrap with pre (XN_SYS_UI=true) and post (sleep 100ms, XN_SYS_UI=false)
+# lambdas so the game's UI overlay appears and dismisses correctly.
+search = "  } else {\n    REX_KERNEL_STATE()->CompleteOverlappedDeferred(run_callback, overlapped);\n    return X_ERROR_IO_PENDING;\n  }\n}"
+replace = """  } else {
+    // SPIDERMAN3-BUILDER-PATCH: xam-ui-headless
+    // Broadcast XN_SYS_UI (0x9) true/false around the deferred callback so
+    // the game's UI state machine transitions correctly.
+    auto pre = []() {
+      REX_KERNEL_STATE()->BroadcastNotification(0x9, true);
+    };
+    auto post = []() {
+      rex::thread::Sleep(std::chrono::milliseconds(100));
+      REX_KERNEL_STATE()->BroadcastNotification(0x9, false);
+    };
+    REX_KERNEL_STATE()->CompleteOverlappedDeferred(run_callback, overlapped, pre, post);
+    return X_ERROR_IO_PENDING;
+  }
+}"""

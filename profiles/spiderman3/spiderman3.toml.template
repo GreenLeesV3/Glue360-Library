@@ -1,0 +1,46 @@
+# Spider-Man 3 Recompiled - Runtime Configuration
+#
+# This is a TEMPLATE rendered at deploy time by the recompiler app.
+# {{GAME_DATA_ROOT}} is replaced with the absolute path to the extracted game
+# assets (the directory containing default.xex). All other content mirrors the
+# verified spiderman3.toml shipped with the working build.
+#
+# Source of truth: C:\tmp\Spider-Man 3\spiderman3.toml + the build-output
+# spiderman3.toml at RexGlue360Recomp/spiderman3/out/build/clang-release/.
+# The {{GAME_DATA_ROOT}} placeholder replaces the hardcoded
+# "C:\\tmp\\Workspace 1\\RexGlue360Recomp\\extracted" so the deployed folder is
+# portable (game_data_root points at the local `game/` junction or an absolute
+# extracted path supplied by the user).
+
+[GPU]
+# D3D12 render target path (used when built with D3D12 backend)
+render_target_path_d3d12 = "rov"
+
+# Vulkan render target path (used when built with Vulkan backend)
+render_target_path_vulkan = "fsi"
+
+# Async shader compilation
+async_shader_compilation = true
+
+# Disable VSync for uncapped frame rate
+vsync = false
+
+# D3D12: Allow variable refresh rate / tearing
+d3d12_allow_variable_refresh_rate_and_tearing = true
+
+# Vulkan: Allow immediate present mode (no vsync)
+vulkan_allow_present_mode_immediate = true
+vulkan_sparse_shared_memory = false
+
+# Guest video mode refresh rate
+# 60 FPS unlock: present waits 2 vblanks, 120Hz = 60 FPS
+video_mode_refresh_rate = 120.0
+
+[Core]
+# Default game data path — rendered from {{GAME_DATA_ROOT}} at deploy time.
+# Allows launching the exe without command-line args.
+game_data_root = "{{GAME_DATA_ROOT}}"
+
+# User data and cache paths — relative to exe location for portability
+user_data_root = "user_data"
+cache_path = "user_data\\cache"

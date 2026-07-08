@@ -1,0 +1,173 @@
+# xbox360-recompiler patch manifest
+#
+# Top-level registry of every patch shipped in the patches/ tree. The
+# apply_patches stage reads this manifest to know which patches exist, where
+# they live, what category they belong to, and which game(s) they apply to.
+#
+# Patch categories:
+#   sdk-build        - Source-tree build fixes applied to the SDK source
+#                      before configuring the runtime build. Always-on.
+#   general-runtime  - SDK runtime optimizations/fixes applicable to all
+#                      games. Always-on when building a custom runtime.
+#   game-runtime     - SDK runtime behavioral fixes required by a specific
+#                      game's behavior. Opt-in per game profile.
+#   game-funcid      - Function identification / rename data for a specific
+#                      game's generated source tree. Opt-in per game profile.
+#
+# Patch format:
+#   .patch files use a simple INI-like search-and-replace format (NOT unified
+#   diff) for machine-readability and easy programmatic application:
+#     [patch]
+#     id = "runtime/xam-enum-pending"
+#     category = "game-runtime"
+#     file = "src/kernel/xam/xam_enum.cpp"
+#     search = "<original pre-fix code>"
+#     replace = "<fixed code>"
+#   The `search` field is the ORIGINAL (pristine) code; `replace` is the
+#   fixed code that replaces it. Patches are idempotent: if the search string
+#   is not found (because the fix is already present), the apply stage
+#   reports "already applied" and skips.
+#   Some patches use additional keys (type, symlink_dirs, sentinel_file,
+#   etc.) for filesystem-transform patches that are not pure text
+#   substitution. .cmake fragments are CMake include() injections, not
+#   search/replace.
+
+[manifest]
+version = 1
+description = "Patches for the xbox360-recompiler pipeline: SDK build fixes, runtime optimizations, game-specific runtime fixes, and function-identification data."
+patch_count = 11
+
+# ---------------------------------------------------------------------------
+# Shared build fixes (sdk-build) - applied to the SDK source tree before the
+# runtime CMake configure. Always-on for the custom-runtime build path.
+# ---------------------------------------------------------------------------
+
+[[patches]]
+id = "build-fixes/xxhash-cmake"
+category = "sdk-build"
+path = "patches/shared/build-fixes/xxhash-cmake.patch"
+target = "thirdparty/xxHash/build/cmake/CMakeLists.txt"
+description = "Resolve xxHash's nested build/cmake ../../ paths into a clean absolute XXHASH_DIR so include flags and install interfaces are not polluted with relative-path noise on Windows/clang-cl."
+always_on = true
+reversible = true
+sentinel = "# SPIDERMAN3-BUILDER-PATCH: xxhash-cmake-path"
+
+[[patches]]
+id = "build-fixes/libmspack-symlinks"
+category = "sdk-build"
+path = "patches/shared/build-fixes/libmspack-symlinks.patch"
+target = "thirdparty/libmspack/cabextract/mspack/*"
+description = "Replace Unix symlinks in libmspack/cabextract/mspack/ (which materialize as 25-byte text stubs on Windows with core.symlinks=false) with real byte-for-byte copies of their ../../libmspack/mspack/ targets."
+always_on = true
+reversible = true
+type = "symlinks-to-copies"
+sentinel_file = "thirdparty/libmspack/cabextract/mspack/lzxd.c"
+
+[[patches]]
+id = "build-fixes/cmake4x-module-scan"
+category = "sdk-build"
+path = "patches/shared/build-fixes/cmake4x-module-scan.patch"
+target = "thirdparty/xxHash/build/cmake/CMakeLists.txt; thirdparty/CMakeLists.txt"
+description = "CMake 4.x compatibility: bump xxHash's cmake_minimum_required to the range form (3.10...4.2) and set a global CMAKE_POLICY_VERSION_MINIMUM=3.5 floor before any vendored submodule is added, so glslang/SDL3/fmt/spdlog/snappy/catch2 configure cleanly under CMake 4.x."
+always_on = true
+reversible = true
+sentinel = "# SPIDERMAN3-BUILDER-PATCH: cmake4x-module-scan"
+
+# ---------------------------------------------------------------------------
+# Shared runtime patches (general-runtime) - applied to the SDK runtime
+# source when building a custom rexruntime.dll. Always-on.
+# ---------------------------------------------------------------------------
+
+[[patches]]
+id = "runtime/queue-frames"
+category = "general-runtime"
+path = "patches/shared/runtime/queue-frames.patch"
+target = "include/rex/graphics/d3d12/command_processor.h"
+description = "Reduce the D3D12 command-processor frame queue depth from 3 to 2. Cuts pipeline latency in half for feedback-heavy renderers; raises Spider-Man 3 FPS minimums from ~23 to 30+ with no average-FPS cost."
+always_on = true
+reversible = true
+
+[[patches]]
+id = "runtime/rov-barrier-skip"
+category = "general-runtime"
+path = "patches/shared/runtime/rov-barrier-skip.patch"
+target = "src/graphics/d3d12/render_target_cache.cpp"
+description = "Skip the EDRAM UAV barrier on ROV-path draws that write neither color nor depth/stencil. Prevents useless pipeline drains on read-only draws (depth-only passes, occlusion queries)."
+always_on = true
+reversible = true
+sentinel = "# SPIDERMAN3-BUILDER-PATCH: rov-barrier-skip"
+
+[[patches]]
+id = "runtime/thinlto-ipo"
+category = "general-runtime"
+path = "patches/shared/runtime/thinlto.cmake"
+target = "src/system/CMakeLists.txt (include() injection)"
+description = "CMake include() fragment that sets INTERPROCEDURAL_OPTIMIZATION_RELEASE/RELWITHDEBINFO TRUE on the rexruntime target and emits -flto=thin for clang. 5-15% runtime perf gain via cross-module inlining. Pairs with -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON at configure. Mutually exclusive with PGO."
+always_on = true
+reversible = true
+type = "cmake-include"
+
+[[patches]]
+id = "runtime/spv-builder-accesschain"
+category = "general-runtime"
+path = "patches/shared/runtime/spv-builder-accesschain.patch"
+target = "thirdparty/glslang/SPIRV/SpvBuilder.cpp"
+description = "Fix glslang 14.3.0 createAccessChain null dereference: getResultingAccessChainType() reads from accessChain member state instead of the base/offsets function parameters. The SDK's SPIR-V translator calls createAccessChain(storageClass, base, offsets) directly without setting accessChain, causing accessChain.base=NoResult -> getTypeId(0) -> module.getInstruction(0) -> null -> crash. Fix: set accessChain from parameters before calling getResultingAccessChainType(), then restore. Required for Vulkan backend."
+always_on = true
+reversible = true
+
+# ---------------------------------------------------------------------------
+# Game-specific runtime patches (game-runtime) - opt-in per game profile.
+# Game ID 415607E2 = Spider-Man 3 (Xbox 360) title ID.
+# The three patches below are the load-bearing save-system fix; without them
+# the game's save system hangs on the first enumeration / UI dispatch.
+# ---------------------------------------------------------------------------
+
+[[patches]]
+id = "runtime/xam-enum-pending"
+category = "game-runtime"
+game = "415607E2"
+path = "patches/games/415607E2/runtime/xam-enum-pending.patch"
+target = "src/kernel/xam/xam_enum.cpp"
+description = "xeXamEnumerate async (overlapped) branch must return X_ERROR_IO_PENDING (not the synchronous result) so the game's async poll loop enters its wait state. Without this the save-system enumeration hangs."
+always_on_for_game = "415607E2"
+reversible = true
+
+[[patches]]
+id = "runtime/xenumerator-success"
+category = "game-runtime"
+game = "415607E2"
+path = "patches/games/415607E2/runtime/xenumerator-success.patch"
+target = "src/system/xenumerator.cpp"
+description = "XStaticUntypedEnumerator::WriteItems returns X_ERROR_SUCCESS (with written_count=0) when there are no more items, instead of falling through the zero-length memcpy path. The game's save loop treats non-SUCCESS as failure; this makes 'enumeration complete' look like a successful empty batch."
+always_on_for_game = "415607E2"
+reversible = true
+
+[[patches]]
+id = "runtime/xam-ui-headless"
+category = "game-runtime"
+game = "415607E2"
+path = "patches/games/415607E2/runtime/xam-ui-headless.patch"
+target = "src/kernel/xam/xam_ui.cpp"
+description = "xeXamDispatchHeadless async branch broadcasts XN_SYS_UI (notification 0x9) true/false around the deferred callback (with a 100ms pre-dismiss sleep), so the game's UI state machine transitions correctly when the save dialog appears and dismisses."
+always_on_for_game = "415607E2"
+reversible = true
+
+# ---------------------------------------------------------------------------
+# Game-specific function identification data (game-funcid).
+# The full 18,871-entry rename database ships as a separate data asset
+# (16.94 MB / 631,149 lines) referenced by the JSON; this manifest entry
+# points the apply_patches stage at the reference JSON and the rename script.
+# ---------------------------------------------------------------------------
+
+[[patches]]
+id = "funcid/rename-database"
+category = "game-funcid"
+game = "415607E2"
+path = "patches/games/415607E2/funcid/rename_database.json"
+target = "generated/default/*.cpp; src/*.cpp"
+description = "Function identification rename database for Spider-Man 3: 18,871 of 43,676 functions named (43.21% coverage) via RTTI vtable recovery, instruction patterns, call-graph subsystem clustering, string refs, and import callsite analysis. The reference JSON (this file) points to the master JSON, rename CSV, and the rename applier script, which ship as separate data assets due to size (16.94 MB)."
+always_on_for_game = "415607E2"
+reversible = true
+type = "funcid-data"
+entries = 18871

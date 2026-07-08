@@ -1,0 +1,87 @@
+{
+  "project": "Spider-Man 3 Xbox 360 Recompilation",
+  "title_id": "415607E2",
+  "description": "Function identification rename database for Spider-Man 3 (Xbox 360). The full master database contains 18,871 identified functions out of 43,676 total (43.21% coverage), derived from RTTI vtable recovery, instruction patterns, call-graph subsystem clustering, string references, and import callsite analysis.",
+  "coverage": {
+    "total_functions": 43676,
+    "identified": 18871,
+    "unidentified": 24805,
+    "coverage_pct": 43.21,
+    "confidence_breakdown": {
+      "high": 10666,
+      "medium": 1532,
+      "low": 6673,
+      "none": 24805
+    },
+    "source_breakdown": {
+      "import_thunk": 174,
+      "vtable_rtti": 10085,
+      "instruction_pattern": 3650,
+      "callgraph_subsystem": 4517,
+      "callgraph_hub": 26,
+      "string_ref": 48,
+      "import_call": 68,
+      "manual": 12,
+      "import_callsite": 291
+    }
+  },
+  "merge_rules": {
+    "confidence_priority": "high > medium > low",
+    "source_priority": "manual/import_thunk > import_callsite > vtable_rtti > string_ref > instruction_pattern > callgraph_hub > callgraph_subsystem",
+    "conflict_resolution": "highest (confidence*100 + source_rank) wins; ties keep earlier-applied"
+  },
+  "rename_database": {
+    "note": "The full 18,871-entry master JSON is 16.94 MB / 631,149 lines / 43,676 function records - too large to bundle inline in the app's patch resources. It ships as a separate data asset and is referenced here by path. The apply_patches stage resolves each 'path' relative to the app's resource root (where this patches/ tree lives) or to an absolute path override supplied via the game profile. At bundle time, compute the sha256 of funcid_06_master.json and fill in the field below; the apply stage verifies it after copying the asset into place.",
+    "master_json": {
+      "path": "patches/games/415607E2/funcid/funcid_06_master.json",
+      "format": "json",
+      "entries": 18871,
+      "size_bytes": 17767186,
+      "sha256": "<to-be-computed-at-bundle-time>",
+      "description": "Master function identification database: per-address records with symbol, semantic name, confidence, source, evidence, subsystem membership, call-depth, and alternative names. 43,676 total records (18,871 named + 24,805 unidentified)."
+    },
+    "rename_csv": {
+      "path": "patches/games/415607E2/funcid/funcid_06_rename_map.csv",
+      "format": "csv",
+      "header": "sub_XXXXXXXX,new_name,confidence,source",
+      "entries": 18871,
+      "description": "Flat sub_XXXXXXXX -> new_name map consumed by the rename script. This is the authoritative input for the apply step; the master JSON is the provenance/audit record."
+    },
+    "rename_script": {
+      "path": "patches/games/415607E2/funcid/funcid_06_rename.py",
+      "format": "python3",
+      "description": "Rename map applier. Whole-token, word-boundary-guarded text substitution of sub_XXXXXXXX symbols across the generated .cpp/.h tree. Supports --apply (in-place, with .bak backup) and dry-run modes. Writes rename_manifest.txt of all replacements.",
+      "usage": "python funcid_06_rename.py --apply --root <game_src_dir> --csv <rename_map.csv>"
+    },
+    "coverage_report": {
+      "path": "patches/games/415607E2/funcid/funcid_06_coverage.md",
+      "format": "markdown"
+    },
+    "source_files": {
+      "funcid_00_addr_table.json": "universe of 43676 addrs (174 import thunks + 43502 generated)",
+      "funcid_01_import_callsites.json": "341 functions calling __imp__* imports",
+      "funcid_02_string_refs.json": "55 functions with string literal references",
+      "funcid_03_vtables.json": "10086 functions from RTTI vtable recovery (2802 classes)",
+      "funcid_04_patterns.json": "5097 functions from instruction patterns",
+      "funcid_05_callgraph.json": "29 hubs + 25 subsystems (5356 members) + 594 call depths"
+    }
+  },
+  "sample_entries": [
+    {"addr": "0x82280070", "symbol": "sub_82280070", "name": "std::exception_vfunc0", "confidence": "high", "source": "vtable_rtti", "evidence": "vtable at 0x8200174C slot 0, class 'std::exception'"},
+    {"addr": "0x822800B8", "symbol": "sub_822800B8", "name": "AtomicAddRef", "confidence": "medium", "source": "instruction_pattern", "evidence": "1 ldarx, 2 stdcx CAS loop, addi+1 refcount increment"},
+    {"addr": "0x82280390", "symbol": "sub_82280390", "name": "slc_entity_t_vfunc2", "confidence": "high", "source": "vtable_rtti", "evidence": "vtable at 0x820018BC slot 2, class 'slc_entity_t'"},
+    {"addr": "0x82280510", "symbol": "sub_82280510", "name": "Vector3DistanceDot", "confidence": "medium", "source": "instruction_pattern", "evidence": "38 VMX instr, vsubfp+vdot 4x4 dot, SIMD distance"}
+  ],
+  "subsystem_address_map_summary": [
+    {"range": "0x82200000-0x822FFFFF", "label": "misc", "functions": 2338, "named": 1802, "coverage_pct": 77.1},
+    {"range": "0x82300000-0x823FFFFF", "label": "CoreContainers/ListHash + GameInit"},
+    {"range": "0x82B00000-0x82BFFFFF", "label": "Runtime_MemThunks + Subsystem84 + Graphics_RenderDriver", "functions": 8445, "named": 756, "coverage_pct": 9.0}
+  ],
+  "callgraph_subsystems_top5": [
+    {"name": "Scene_MeshRender", "root_addr": "0x828C7200", "function_count": 439},
+    {"name": "Audio_Engine", "root_addr": "0x8296A1D8", "function_count": 426},
+    {"name": "Runtime_MemThunks", "root_addr": "0x82B07F80", "function_count": 409},
+    {"name": "Game_MainLoop_Orchestrator", "root_addr": "0x828409F0", "function_count": 390},
+    {"name": "Xam_Wrapper_Thunks", "root_addr": "0x82A1CC38", "function_count": 0}
+  ]
+}

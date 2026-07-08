@@ -1,0 +1,51 @@
+# Jurassic: The Hunted Recompiled - Runtime Configuration
+#
+# This is a TEMPLATE rendered at deploy time by the recompiler app.
+# {{GAME_DATA_ROOT}} is replaced with the absolute path to the extracted game
+# assets (the directory containing default.xex). All other content mirrors the
+# verified jurassic_hunted.toml shipped with the working build.
+#
+# Source of truth: C:\tmp\Workspace 2\Jurassic the Hunted Recomp\jurassic_hunted\jurassic_hunted.toml
+# The {{GAME_DATA_ROOT}} placeholder replaces the hardcoded game path so the
+# deployed folder is portable (game_data_root points at the local `game/`
+# junction or an absolute extracted path supplied by the user).
+
+[GPU]
+# D3D12 render target path — RTV preserves the gamma pipeline for CloakNT.
+# Do NOT use "rov" — ROV forces gamma off and the game renders too dark.
+render_target_path_d3d12 = "rtv"
+
+# VSync on — locks to display refresh for stable 60 FPS
+vsync = true
+
+# Guest video mode refresh rate
+# 60 FPS unlock: present waits 2 vblanks, 120Hz = 60 FPS
+video_mode_refresh_rate = 120.0
+
+# Texture cache limits — defaults too low for 3.16GB game data
+texture_cache_memory_limit_hard = 4096
+texture_cache_memory_limit_soft = 2048
+texture_cache_memory_limit_soft_lifetime = 120
+texture_cache_memory_limit_render_to_texture = 256
+
+# Performance — reduce command list submission frequency
+d3d12_submit_on_primary_buffer_end = false
+
+# Shader cache persistence
+store_shaders = true
+
+[Core]
+# Allow invalid fetch constants (CloakNT uses some edge-case GPU ops)
+gpu_allow_invalid_fetch_constants = true
+
+# Default game data path — rendered from {{GAME_DATA_ROOT}} at deploy time.
+# Allows launching the exe without command-line args.
+game_data_root = "{{GAME_DATA_ROOT}}"
+
+# User data and cache paths — relative to exe location for portability
+user_data_root = "user_data"
+cache_path = "user_data\\cache"
+
+# MNK disabled — game's 61% right-stick dead zone makes mouse aiming impractical.
+# Use a DualSense controller instead.
+mnk_mode = false

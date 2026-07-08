@@ -1,0 +1,31 @@
+# kQueueFrames 3 -> 2 fix
+#
+# Source: include/rex/graphics/d3d12/command_processor.h line 231
+#
+# The D3D12 command processor queues up to kQueueFrames frames of GPU work
+# before blocking the CPU on the oldest fence. The upstream SDK ships
+# kQueueFrames = 3. For Spider-Man 3's feedback-heavy renderer (ROV EDRAM
+# path, frequent readbacks, vsync-locked present), a 3-frame queue adds up
+# to ~50ms of pipeline latency before a CPU-side state change is observed by
+# the GPU, which tanks FPS minimums (the game stalls waiting for the queue
+# to drain on certain frame transitions).
+#
+# Reducing the queue depth to 2 cuts that latency in half and raises FPS
+# minimums from ~23 to 30+ with no average-FPS cost (average 46-48). This is
+# a compile-time constant in a header, NOT a cvar - changing it requires
+# rebuilding the runtime from source.
+#
+# This is a general-runtime patch (applied for all games, not just SM3):
+# the shallower queue helps any feedback-heavy renderer.
+#
+# NOTE: the shipped SDK source tree is ALREADY fixed (line 231 reads
+# kQueueFrames = 2). On the shipped tree the search string (= 3) will NOT
+# match and the apply stage reports "already applied". On a pristine
+# upstream SDK drop, the search matches and the replace installs the fix.
+
+[patch]
+id = "runtime/queue-frames"
+category = "general-runtime"
+file = "include/rex/graphics/d3d12/command_processor.h"
+search = "static constexpr uint32_t kQueueFrames = 3;"
+replace = "static constexpr uint32_t kQueueFrames = 2;"

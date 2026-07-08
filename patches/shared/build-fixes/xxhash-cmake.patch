@@ -1,0 +1,58 @@
+# xxHash CMake path fix
+#
+# Problem:
+#   The xxHash CMakeLists.txt lives in a nested directory
+#   (thirdparty/xxHash/build/cmake/CMakeLists.txt). The pristine upstream
+#   xxHash CMake file uses relative ../../ paths directly in file(STRINGS)
+#   and target_include_directories, so on Windows with clang-cl the include
+#   flags and ninja/build logs fill up with noisy
+#   "C:/.../xxHash/build/cmake/../.." strings, and on some CMake 4.x
+#   configurations the unresolved relative path can break the
+#   INSTALL_INTERFACE generation.
+#
+# Fix:
+#   Resolve the two-level parent into an absolute XXHASH_DIR once (via
+#   get_filename_component), then use ${XXHASH_DIR} everywhere instead of
+#   ../..  This produces clean include flags
+#   ("C:/.../xxHash" not "C:/.../xxHash/build/cmake/../..") and a stable
+#   install interface.
+#
+# NOTE: the shipped SDK source tree is ALREADY fixed (line 18 contains the
+# get_filename_component call and all file(STRINGS)/target_include_directories
+# use ${XXHASH_DIR}). This patch is the idempotent re-applier: the search
+# strings target the PRISTINE form (using ../../ directly), which does NOT
+# exist in the shipped tree, so the apply stage reports "already applied"
+# and no changes are made. On a pristine upstream xxHash drop that lacks the
+# XXHASH_DIR resolution, the search strings match and the replace installs
+# the fix WITHOUT creating duplicates.
+
+[patch]
+id = "build-fixes/xxhash-cmake"
+category = "sdk-build"
+file = "thirdparty/xxHash/build/cmake/CMakeLists.txt"
+# Pristine upstream: file(STRINGS) uses ../../ directly, no XXHASH_DIR
+# variable defined. The fix inserts the get_filename_component resolution
+# before the first file(STRINGS) and rewrites the path to use ${XXHASH_DIR}.
+# On the already-fixed shipped tree, this search will NOT match (the file
+# uses ${XXHASH_DIR}/xxhash.h instead of ../../xxhash.h), so it is
+# idempotent and will NOT create a duplicate get_filename_component line.
+search = "cmake_minimum_required (VERSION 3.10 FATAL_ERROR)\n\nfile(STRINGS \"${CMAKE_CURRENT_SOURCE_DIR}/../../xxhash.h\" XXHASH_VERSION_MAJOR"
+replace = """cmake_minimum_required (VERSION 3.10 FATAL_ERROR)
+
+# SPIDERMAN3-BUILDER-PATCH: xxhash-cmake-path
+# Resolve the nested build/cmake dir up to the xxHash root so include flags
+# and install interfaces use clean absolute paths instead of ../../
+get_filename_component(XXHASH_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+
+file(STRINGS "${XXHASH_DIR}/xxhash.h" XXHASH_VERSION_MAJOR"""
+
+[patch]
+id = "build-fixes/xxhash-cmake-include"
+category = "sdk-build"
+file = "thirdparty/xxHash/build/cmake/CMakeLists.txt"
+# Pristine upstream: target_include_directories uses the relative ../../
+# directly. The fix references the resolved ${XXHASH_DIR} variable.
+# On the already-fixed shipped tree (line 106 already uses ${XXHASH_DIR}),
+# this search will NOT match, so it is idempotent.
+search = "target_include_directories(xxhash\n  PUBLIC\n    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../..>\n    $<INSTALL_INTERFACE:include/>)"
+replace = "target_include_directories(xxhash\n  PUBLIC\n    $<BUILD_INTERFACE:${XXHASH_DIR}>\n    $<INSTALL_INTERFACE:include/>)"

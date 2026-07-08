@@ -1,0 +1,70 @@
+# CMake 4.x module scan fix
+#
+# Problem:
+#   CMake 4.0 removed compatibility with cmake_minimum_required < 3.5 and
+#   deprecated/removed a number of legacy modules that the SDK source tree
+#   and its vendored submodules scan for or include. Two concrete failures
+#   when configuring the runtime with CMake >= 4.0:
+#
+#   1. xxHash's CMakeLists.txt declares `cmake_minimum_required(VERSION 3.10
+#      FATAL_ERROR)`. Under CMake 4.x the compatibility with < 3.5 is gone,
+#      and the deprecated `cmake_minimum_required(VERSION x FATAL_ERROR)`
+#      form without a `...<upper>` range emits a policy warning that, with
+#      -Werror=dev, aborts the configure. The fix is to use the version-range
+#      form `cmake_minimum_required(VERSION 3.10...4.2)` so the project
+#      declares both a floor and a ceiling that CMake 4.x accepts cleanly.
+#
+#   2. The glslang submodule (pulled in only when REXGLUE_USE_VULKAN is on)
+#      ships an outdated cmake_minimum_required. The SDK's thirdparty
+#      CMakeLists.txt already works around this with:
+#          set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
+#      before add_subdirectory(glslang). On CMake 4.x without that line, the
+#      glslang configure fails. The fix ensures the policy floor is set
+#      globally before ANY submodule that scans for legacy modules is added.
+#
+# Fix applied by this patch:
+#   - Bump xxHash's cmake_minimum_required to the range form.
+#   - Set CMAKE_POLICY_VERSION_MINIMUM=3.5 globally at the top of the
+#     thirdparty CMakeLists.txt (before any add_subdirectory) so every
+#     vendored submodule (xxHash, glslang, SDL3, fmt, spdlog, snappy,
+#     catch2) inherits the 3.5 floor and does not trip CMake 4.x's
+#     removed-module / deprecated-policy guards.
+#
+# NOTE: the shipped SDK source tree already sets the glslang-specific
+# CMAKE_POLICY_VERSION_MINIMUM at thirdparty/CMakeLists.txt line 313. This
+# patch makes the floor universal (applied before ALL submodules, not just
+# glslang). The xxHash version-range bump is idempotent: if the file already
+# contains `3.10...4.2` the search string (the old `3.10 FATAL_ERROR` form)
+# will not match and the apply stage reports "already applied".
+
+[patch]
+id = "build-fixes/cmake4x-xxhash-min-version"
+category = "sdk-build"
+file = "thirdparty/xxHash/build/cmake/CMakeLists.txt"
+# Pristine upstream: single-version floor with the deprecated FATAL_ERROR
+# keyword. CMake 4.x rejects compatibility with < 3.5 and warns on the
+# non-range form. Fix: use the version-range form (floor 3.10, ceiling 4.2)
+# accepted by CMake 3.10 through 4.x.
+search = "cmake_minimum_required (VERSION 3.10 FATAL_ERROR)"
+replace = "cmake_minimum_required(VERSION 3.10...4.2)"
+
+[patch]
+id = "build-fixes/cmake4x-policy-floor"
+category = "sdk-build"
+file = "thirdparty/CMakeLists.txt"
+# Pristine: no global CMAKE_POLICY_VERSION_MINIMUM before the submodule
+# walk. The glslang-specific set() exists lower in the file (line 313) but
+# only covers glslang. Fix: inject a global floor right after
+# BUILD_SHARED_LIBS so every add_subdirectory() below inherits it.
+search = "set(BUILD_SHARED_LIBS OFF CACHE BOOL \"\" FORCE)"
+replace = """set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
+# SPIDERMAN3-BUILDER-PATCH: cmake4x-module-scan
+# CMake 4.x removed compatibility with cmake_minimum_required < 3.5 and
+# several legacy modules. Set a global policy floor so every vendored
+# submodule (xxHash, glslang, SDL3, fmt, spdlog, snappy, catch2) configures
+# cleanly under CMake 4.x without -Werror=dev aborts or missing-module
+# errors.
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "" FORCE)
+endif()"""

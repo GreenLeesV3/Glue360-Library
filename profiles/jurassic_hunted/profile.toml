@@ -1,0 +1,272 @@
+# Jurassic: The Hunted (Xbox 360) — Game Profile
+#
+# Declarative description of everything game-specific the recompiler needs to
+# produce a playable native Windows port of Jurassic: The Hunted. Consumed by
+# recomp::profile::load_profile() (src/profile/game_profile.cpp).
+
+# --- Setjmp/Longjmp addresses (top-level keys, NOT inside any [section]) ---
+# The profile loader reads these via root.get("setjmp_address") — they MUST be
+# before the first [section] header. Injected into the manifest's [entrypoint]
+# table by rexglue_init (code path: ManifestConfig::Load -> LoadBinaryConfig
+# passes [entrypoint] subtable -> ApplyToml reads toml["setjmp_address"]).
+# Xenon CRT _setjmp begins with a patchable-hook check that falls through into
+# the register-save body; the function scanner truncates it at the conditional
+# bnectr, so the recompiled version returns garbage. Without these, Lua 5.1's
+# luaD_rawrunprotected silently skips f_luaopen and the GC crashes.
+setjmp_address = "0x8261C960"
+longjmp_address = "0x8261C520"
+
+[profile]
+id = "jurassic_hunted"
+name = "Jurassic: The Hunted (Xbox 360)"
+title_id = "41560870"          # Xbox 360 retail title ID
+sdk_version = "0.8.0"          # RexGlue360 SDK version this profile targets
+xex_entrypoint = "default.xex"
+project_name = "jurassic_hunted"
+# --- Function hints (injected into manifest via includes mechanism) ---
+# Uses [functions] format (Skate3Recomp pattern): each entry is a function
+# root. Empty {} = "analyze from here" (same as old [entrypoint_functions]).
+# With end/parent data, the scanner avoids truncation bugs. The injection
+# code writes these to jurassic_hunted_functions.toml and adds it to
+# [entrypoint].includes in the manifest, which ApplyTableWithIncludes merges.
+[functions]
+# Tail-call targets the scanner missed (reported as UnresolvedCall by Validate)
+"0x82500B70" = {}
+"0x8250D8C0" = {}
+"0x8251A420" = {}
+# Data-referenced vtable thunks (found by find_missing_funcs.py)
+"0x8236F3F0" = {}
+"0x82504238" = {}
+"0x82504240" = {}
+"0x82504248" = {}
+"0x82504250" = {}
+"0x82504258" = {}
+"0x82504260" = {}
+"0x82504270" = {}
+"0x82504278" = {}
+"0x82504280" = {}
+"0x82509070" = {}
+"0x82509078" = {}
+"0x82509080" = {}
+"0x825092F8" = {}
+"0x82509300" = {}
+"0x82509310" = {}
+"0x82509318" = {}
+"0x82509320" = {}
+"0x82509A58" = {}
+"0x8250A710" = {}
+"0x8250B5D8" = {}
+"0x8250E350" = {}
+"0x8251D9D0" = {}
+"0x82550770" = {}
+"0x82552A00" = {}
+"0x82552A20" = {}
+"0x82552BA0" = {}
+"0x82552BC0" = {}
+"0x82552BE0" = {}
+"0x82552C00" = {}
+"0x82552C20" = {}
+"0x82552C40" = {}
+"0x82552C60" = {}
+"0x82552C80" = {}
+"0x82552CA0" = {}
+"0x82552CC0" = {}
+"0x82559D18" = {}
+# Arithmetic-addressed virtual-dispatch thunks (found by find_vcall_thunks.py)
+"0x82100604" = {}
+"0x8210063C" = {}
+"0x82114CF4" = {}
+"0x82114D4C" = {}
+"0x82114DA4" = {}
+"0x82114DD4" = {}
+"0x82117A40" = {}
+"0x82117A50" = {}
+"0x82117A60" = {}
+"0x8211A6C0" = {}
+"0x8212C0E0" = {}
+"0x8212C148" = {}
+"0x821301E0" = {}
+"0x82131398" = {}
+"0x821666F8" = {}
+"0x821737EC" = {}
+"0x82173968" = {}
+"0x82173F58" = {}
+"0x82193474" = {}
+"0x8219348C" = {}
+"0x821ACA38" = {}
+"0x821ACB30" = {}
+"0x821AD458" = {}
+"0x82225F98" = {}
+"0x822289C8" = {}
+"0x8222DAE8" = {}
+"0x82244440" = {}
+"0x82244468" = {}
+"0x82252964" = {}
+"0x82257864" = {}
+"0x82276E44" = {}
+"0x822A75A0" = {}
+"0x822A75B0" = {}
+"0x822D0400" = {}
+"0x822D0458" = {}
+"0x822D0984" = {}
+"0x822D0B94" = {}
+"0x822E76CC" = {}
+"0x822E76DC" = {}
+"0x822E76F8" = {}
+"0x822E97A0" = {}
+"0x822EF12C" = {}
+"0x82304BD8" = {}
+"0x82307120" = {}
+"0x823074A8" = {}
+"0x82312B1C" = {}
+"0x82314E04" = {}
+"0x8231FB80" = {}
+"0x8234E270" = {}
+"0x8237CAC0" = {}
+"0x8237CAE8" = {}
+"0x8237CB10" = {}
+"0x8237CB38" = {}
+"0x8237CB60" = {}
+"0x8237CB88" = {}
+"0x8237CBD8" = {}
+"0x8237CC00" = {}
+"0x8237CC28" = {}
+"0x8237CC50" = {}
+"0x8237CC78" = {}
+"0x8237CCA0" = {}
+"0x8237CCC8" = {}
+"0x8237CCF0" = {}
+"0x8237CD18" = {}
+"0x8237CD40" = {}
+"0x8237CD68" = {}
+"0x8237CE2C" = {}
+"0x823936FC" = {}
+"0x823A5868" = {}
+"0x823A600C" = {}
+"0x823B186C" = {}
+"0x823B5F38" = {}
+"0x823D5A90" = {}
+"0x823D5B2C" = {}
+"0x823DC5A4" = {}
+"0x823DC5BC" = {}
+"0x823E1994" = {}
+"0x823E425C" = {}
+"0x823E8CE8" = {}
+"0x823E8D10" = {}
+"0x823ED56C" = {}
+"0x823ED9E0" = {}
+"0x823FFAE4" = {}
+"0x8240B97C" = {}
+"0x8240B994" = {}
+"0x8240B9AC" = {}
+"0x8240B9C4" = {}
+"0x8240B9DC" = {}
+"0x824152AC" = {}
+"0x824152C4" = {}
+"0x824152DC" = {}
+"0x824152F4" = {}
+"0x8241530C" = {}
+"0x824183C8" = {}
+"0x824183F0" = {}
+"0x82418418" = {}
+"0x82419D50" = {}
+"0x82419DB8" = {}
+"0x82419DD0" = {}
+"0x82419DE8" = {}
+"0x82419E00" = {}
+"0x82419E18" = {}
+"0x8241B8CC" = {}
+"0x824211C4" = {}
+"0x824211DC" = {}
+"0x82434664" = {}
+"0x8244E4A4" = {}
+"0x82478E80" = {}
+"0x824A8FCC" = {}
+"0x824A8FE4" = {}
+"0x82554538" = {}
+"0x82631CF4" = {}
+"0x8263989C" = {}
+"0x82643334" = {}
+"0x8264334C" = {}
+"0x826433B4" = {}
+"0x8265ADD4" = {}
+"0x8265B604" = {}
+"0x826626D4" = {}
+"0x826649D4" = {}
+"0x826666DC" = {}
+"0x82666C9C" = {}
+"0x8266FA4C" = {}
+# lis/addi-materialized Lua-binding trampolines (runtime-demanded only)
+"0x824198CC" = {}
+"0x82419D60" = {}
+"0x82419D88" = {}
+"0x82419DB0" = {}
+"0x82419DC8" = {}
+"0x82419DE0" = {}
+"0x82419DF8" = {}
+"0x82419E10" = {}
+
+# --- Switch table overrides (injected into manifest) ---
+# Misdetected jump table at Lua EvalFunction dispatch (index byte [r3+24],
+# 8-byte {func, name} records at 0x827264D8). Auto-detection produced a
+# 1-case switch on the wrong register that trapped at runtime.
+[[switch_tables]]
+address = "0x8236F3EC"
+register = 11
+labels = ["0x8236F3F0", "0x8236F450", "0x8236F410", "0x8236F430"]
+
+[build]
+# No runtime patches needed — the prebuilt SDK works as-is.
+requires_sdk_source = false
+
+[build_options]
+# Static CRT — disabled: requires building the SDK from source for /MT
+# consistency. The prebuilt SDK uses /MD, so mixing causes LNK2038.
+# Enable only if requires_sdk_source is also true.
+static_msvc_runtime = false
+# LTO for Release builds only (smaller exe, better optimization)
+enable_lto = true
+# CPU target — "" = x86-64 baseline (works on all x64 CPUs)
+cpu_target = ""
+
+# --- Source files copied into the generated project's src/ after codegen ---
+[[sources]]
+from = "src/main.cpp"
+to   = "src/main.cpp"
+optional = false
+
+[[sources]]
+from = "src/jurassic_hunted_app.h"
+to   = "src/jurassic_hunted_app.h"
+optional = false
+
+# --- Cvars: rendered into jurassic_hunted_app.h::OnPreSetup via the template ---
+# Only safe cvars that don't interfere with the CloakNT engine's gamma pipeline.
+# Do NOT set gamma_render_target_as_unorm16, snorm16_render_target_full_range,
+# mrt_edram_used_range_clamp_to_min, readback_resolve, anisotropic_override, or
+# swap_post_effect — the SDK defaults produce correct rendering. Overriding
+# them caused dark/shadowy gameplay.
+[cvars]
+# Render path — RTV (SDK default on AMD, supports gamma pipeline)
+render_target_path_d3d12 = "rtv"
+# Texture cache — defaults too low for 3.16GB game data
+texture_cache_memory_limit_hard = "4096"
+texture_cache_memory_limit_soft = "2048"
+texture_cache_memory_limit_soft_lifetime = "120"
+texture_cache_memory_limit_render_to_texture = "256"
+# Performance
+d3d12_submit_on_primary_buffer_end = "false"
+# Shader cache persistence
+store_shaders = "true"
+
+# --- Deploy configuration ---
+[deploy]
+# Runtime TOML template (relative to profile_dir)
+toml_template = "jurassic_hunted.toml.template"
+# DLLs copied alongside the exe into the portable folder.
+# No TracyClient.dll — Jurassic builds with Tracy OFF.
+copy_dlls = ["rexruntime.dll"]
+# Create a `game/` junction to the extracted assets in the deploy folder
+create_game_junction = true
+# Seed a `user_data/` dir for saves + shader cache
+create_user_data = true

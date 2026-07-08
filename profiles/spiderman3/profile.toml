@@ -1,0 +1,198 @@
+# Spider-Man 3 (Xbox 360) — Game Profile
+#
+# Declarative description of everything game-specific the recompiler needs to
+# produce a playable native Windows port of Spider-Man 3. Consumed by
+# recomp::profile::load_profile() (src/profile/game_profile.cpp).
+#
+# Schema: docs/01_architecture.md §6.2. Patches are data, not code.
+
+[profile]
+id = "spiderman3"
+name = "Spider-Man 3 (Xbox 360)"
+title_id = "415607E2"          # Xbox 360 retail title ID
+sdk_version = "0.8.0"          # RexGlue360 SDK version this profile targets
+xex_entrypoint = "default.xex"
+project_name = "spiderman3"
+
+# --- Entrypoint function hints (injected into manifest before codegen) ---
+# PPC addresses in the XEX code section that rexglue codegen must treat as
+# analysis roots. Auto-discovery misses these (linker stubs / hand-written
+# asm branch targets). Without them, codegen reports UnresolvedCall errors.
+# See docs/03_codegen_automation.md §2.2 (9 entrypoint hints).
+[entrypoint_functions]
+"0x82967D40" = "sub_82967D40"
+"0x8297481C" = "sub_8297481C"
+"0x82980954" = "sub_82980954"
+"0x829812EC" = "sub_829812EC"
+"0x829850E0" = "sub_829850E0"
+"0x82996158" = "sub_82996158"
+"0x829A1468" = "sub_829A1468"
+"0x829B5F28" = "sub_829B5F28"
+"0x829B93B0" = "sub_829B93B0"
+
+[build]
+# The profile declares runtime patches → a custom rexruntime.dll must be built
+# from the SDK source tree (the build_runtime stage runs).
+requires_sdk_source = true
+
+[build_options]
+# Static CRT — safe here because requires_sdk_source=true means the SDK is
+# rebuilt from source with /MT consistency (Skate3Recomp pattern).
+static_msvc_runtime = true
+# LTO for Release builds only (smaller exe, better optimization)
+enable_lto = true
+# CPU target — "" = x86-64 baseline (works on all x64 CPUs)
+cpu_target = ""
+
+# CMake -D defines passed to the runtime build. Each maps to a flag-guarded
+# overlay directory under patches/game-runtime/<flag_name>/ (see
+# docs/02_patch_system.md). Applied to the SDK source tree before configure.
+runtime_flags = [
+  "REX_GAME_SAVE_SYSTEM_FIX",         # xam_ui + xam_enum + xenumerator (3 files)
+  "REX_ROV_BARRIER_SKIP",             # render_target_cache.cpp EDRAM barrier skip
+  "REX_QUEUEFRAMES_2",                # command_processor.h kQueueFrames 3->2
+  "REX_XAM_DISPATCH_HEADLESS",        # xam_ui.cpp deferred pre/post (part of save fix)
+  "REX_XAM_ENUM_IO_PENDING",          # xam_enum.cpp async returns IO_PENDING
+  "REX_XENUMERATOR_WRITEITEMS_ZERO",  # xenumerator.cpp 0-items -> SUCCESS
+  "REX_THINLTO",                      # system/CMakeLists ThinLTO (general-runtime)
+]
+
+# --- Source files copied into the generated project's src/ after codegen ---
+# These are the hand-written files (BUILD_GUIDE §4); codegen only writes
+# generated/, never src/. The 5 files below are the working set wired into the
+# project's CMakeLists.txt.
+[[sources]]
+from = "src/main.cpp"
+to   = "src/main.cpp"
+optional = false
+
+[[sources]]
+from = "src/spiderman3_app.h"
+to   = "src/spiderman3_app.h"
+optional = false
+
+[[sources]]
+from = "src/roundevenf.cpp"
+to   = "src/roundevenf.cpp"
+optional = false
+
+[[sources]]
+from = "src/particle_perf.cpp"
+to   = "src/particle_perf.cpp"
+optional = false
+
+[[sources]]
+from = "src/xmp_bypass.cpp"
+to   = "src/xmp_bypass.cpp"
+optional = false
+
+# --- Runtime patch descriptors (applied to the SDK source tree) ---
+# 3 REQUIRED save-system patches + 2 optional perf patches + 1 build-config.
+# See docs/04_build_automation.md §0.4 and §4.1.
+
+[[runtime_patches]]
+id       = "xam_enum"
+flag     = "REX_XAM_ENUM_IO_PENDING"
+target   = "src/kernel/xam/xam_enum.cpp"
+category = "game-runtime"
+required = true
+
+[[runtime_patches]]
+id       = "xenumerator"
+flag     = "REX_XENUMERATOR_WRITEITEMS_ZERO"
+target   = "src/system/xenumerator.cpp"
+category = "game-runtime"
+required = true
+
+[[runtime_patches]]
+id       = "xam_ui"
+flag     = "REX_XAM_DISPATCH_HEADLESS"
+target   = "src/kernel/xam/xam_ui.cpp"
+category = "game-runtime"
+required = true
+
+[[runtime_patches]]
+id       = "render_target_cache"
+flag     = "REX_ROV_BARRIER_SKIP"
+target   = "src/graphics/d3d12/render_target_cache.cpp"
+category = "general-runtime"
+required = false
+
+[[runtime_patches]]
+id       = "command_processor"
+flag     = "REX_QUEUEFRAMES_2"
+target   = "src/graphics/d3d12/command_processor.h"
+category = "general-runtime"
+required = false
+
+[[runtime_patches]]
+id       = "thinlto"
+flag     = "REX_THINLTO"
+target   = "system/CMakeLists"
+category = "game-build"
+required = true
+
+# SpvBuilder.cpp fix — always-on overlay (no flag needed, overlay is copied
+# unconditionally). Fixes glslang 14.3.0 createAccessChain null deref that
+# crashes the Vulkan backend on first shader translation. Harmless on D3D12.
+[[runtime_patches]]
+id       = "spv_builder"
+flag     = ""
+target   = "thirdparty/glslang/SPIRV/SpvBuilder.cpp"
+category = "general-runtime"
+required = true
+
+# --- Cvars: rendered into spiderman3_app.h::OnPreSetup via the template ---
+# All 22 cvars forced in OnPreSetup (spiderman3_app.h lines 36-92). Order
+# matches the source for readability; the renderer sorts by insertion order.
+[cvars]
+# Render path — both set; only the active backend's cvar takes effect.
+render_target_path_d3d12 = "rov"
+render_target_path_vulkan = "fsi"
+# 60 FPS unlock: present waits 2 vblanks, 120Hz = 60 FPS.
+video_mode_refresh_rate = "120.0"
+# City rendering fixes (gamma + HDR + MRT + readback).
+gamma_render_target_as_unorm16 = "true"
+snorm16_render_target_full_range = "true"
+mrt_edram_used_range_clamp_to_min = "true"
+readback_resolve = "fast"
+# Visual enhancements.
+anisotropic_override = "5"
+swap_post_effect = "fxaa"
+# Performance optimizations — shared (both backends).
+host_present_from_non_ui_thread = "true"
+readback_memexport = "true"
+readback_memexport_fast = "true"
+# D3D12-specific (silently ignored on Vulkan).
+d3d12_bindless = "true"
+d3d12_tiled_shared_memory = "true"
+d3d12_submit_on_primary_buffer_end = "false"
+d3d12_pipeline_creation_threads = "2"
+# Vulkan-specific (silently ignored on D3D12).
+vulkan_allow_present_mode_immediate = "true"
+vulkan_sparse_shared_memory = "false"
+vulkan_submit_on_primary_buffer_end = "true"
+vulkan_pipeline_creation_threads = "2"
+vulkan_dynamic_rendering = "true"
+# Texture cache (shared).
+texture_cache_memory_limit_hard = "4096"
+texture_cache_memory_limit_soft = "2048"
+texture_cache_memory_limit_soft_lifetime = "120"
+texture_cache_memory_limit_render_to_texture = "256"
+# Fuzzy alpha + dither.
+use_fuzzy_alpha_epsilon = "true"
+present_dither = "true"
+# Shader cache.
+store_shaders = "true"
+
+# --- Deploy configuration ---
+[deploy]
+# Runtime TOML template (relative to profile_dir). Rendered with
+# {{GAME_DATA_ROOT}} -> the extracted game data path at deploy time.
+toml_template = "spiderman3.toml.template"
+# DLLs copied alongside the exe into the portable folder.
+copy_dlls = ["rexruntime.dll", "TracyClient.dll"]
+# Create a `game/` junction to the extracted assets in the deploy folder.
+create_game_junction = true
+# Seed a `user_data/` dir for saves + shader cache.
+create_user_data = true

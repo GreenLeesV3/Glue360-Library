@@ -1,0 +1,50 @@
+# XStaticUntypedEnumerator::WriteItems returns SUCCESS for 0 items
+#
+# Source: src/system/xenumerator.cpp lines 55-76
+#
+# Problem:
+#   When an enumerator has enumerated all items (current_item_ == item_count_),
+#   the next WriteItems call computes count = 0. The pristine upstream code
+#   falls through to the data-copy path with count=0 (computing size=0,
+#   offset=current_item_*item_size, memcpy of 0 bytes), which is harmless on
+#   its own. But some callers (notably Spider-Man 3's save-content
+#   enumerator) check the return code rather than the written_count to
+#   decide whether the enumeration is complete, and a non-SUCCESS return
+#   from a zero-item write is treated as "enumeration failed" rather than
+#   "enumeration complete", causing a retry or abort of the save flow.
+#
+# Fix:
+#   Short-circuit the zero-item case: set *written_count = 0 and return
+#   X_ERROR_SUCCESS immediately, without touching the buffer or falling
+#   through to the memcpy path. This makes "no more items" look like a
+#   successful empty batch to the caller, which is the semantics the game's
+#   save loop expects.
+#
+# The shipped SDK source already contains the early-return guard (lines
+# 58-63: `if (!count) { ... return X_ERROR_SUCCESS; }`). This patch is
+# idempotent: on the shipped tree the search string (the pristine form
+# without the guard) will NOT match and the apply stage reports
+# "already applied". On a pristine upstream drop without the guard, the
+# search matches and the replace installs it.
+#
+# Game-runtime patch (opt-in per game; required for SM3 saves).
+# Game ID 415607E2 = Spider-Man 3.
+
+[patch]
+id = "runtime/xenumerator-success"
+category = "game-runtime"
+file = "src/system/xenumerator.cpp"
+# Pristine upstream: no zero-item early return. count=0 falls through to
+# the memcpy path (harmless but returns a non-SUCCESS code in some error
+# paths, which the game misreads as failure). Fix: short-circuit count=0
+# with written_count=0 and X_ERROR_SUCCESS.
+search = "  size_t count = std::min(item_count_ - current_item_, items_per_enumerate());\n  size_t size = count * item_size();"
+replace = """  size_t count = std::min(item_count_ - current_item_, items_per_enumerate());
+  // SPIDERMAN3-BUILDER-PATCH: xenumerator-success
+  if (!count) {
+    if (written_count) {
+      *written_count = 0;
+    }
+    return X_ERROR_SUCCESS;
+  }
+  size_t size = count * item_size();"""

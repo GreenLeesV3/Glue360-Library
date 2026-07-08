@@ -1,0 +1,53 @@
+# libmspack symlinks -> copies fix
+#
+# Problem:
+#   thirdparty/libmspack is a git submodule that contains Unix symlinks.
+#   cabextract/mspack/* are symlinks to ../../libmspack/mspack/* (the shared
+#   libmspack source). On Windows, git with core.symlinks=false (the default
+#   without a privileged account) materializes these as tiny plain-text files
+#   whose only contents is the symlink target path, e.g. a 25-byte
+#   "ChangeLog" file containing the literal string "../../libmspack/ChangeLog".
+#   The CMake build then compiles a 25-byte text file as if it were C source
+#   -> catastrophic compile failure (or, with -w, a link error for missing
+#   symbols).
+#
+#   Verified in the shipped tree:
+#     thirdparty/libmspack/cabextract/mspack/ChangeLog  -> 25 bytes, content
+#       "../../libmspack/ChangeLog"
+#     ... and 13 more .c/.h symlinks in cabextract/mspack/ all pointing at
+#       ../../libmspack/mspack/<same-name>.
+#
+# Fix:
+#   Replace every symlink under thirdparty/libmspack/cabextract/mspack/ (and
+#   any other symlinked mspack dir) with a real byte-for-byte copy of the
+#   target file. The SDK's thirdparty/CMakeLists.txt compiles
+#   ${MSPACK_DIR}/lzxd.c where MSPACK_DIR = libmspack/cabextract/mspack, so
+#   lzxd.c MUST be a real file, not a 25-byte path string.
+#
+# This is a filesystem transformation, not a text search/replace. The
+# apply_patches stage implements it as a directory walk: for each entry in
+# the listed symlink dirs, if the entry is a symlink (or a plain file whose
+# content matches "^\\.\\./"), delete it and copy the resolved target file
+# in its place.
+#
+# NOTE: the shipped SDK source tree may already have real copies (if the
+# tarball was extracted on a symlink-resolving system). The apply stage
+# checks the sentinel_file size: if lzxd.c is already >= 1KB it reports
+# "already applied" and skips.
+
+[patch]
+id = "build-fixes/libmspack-symlinks"
+category = "sdk-build"
+type = "symlinks-to-copies"
+# Directories that contain Unix symlinks to ../../libmspack/mspack/*.
+# Each entry is resolved relative to the SDK source root.
+symlink_dirs = [
+  "thirdparty/libmspack/cabextract/mspack",
+]
+# The copy source root for the above: every symlink target like
+# "../../libmspack/mspack/foo.c" resolves under this root.
+copy_source_root = "thirdparty/libmspack/libmspack"
+# Sentinel: after the fix, this file must be a real .c file (>= 1KB), not a
+# 25-byte symlink stub. The apply stage verifies it as the idempotence check.
+sentinel_file = "thirdparty/libmspack/cabextract/mspack/lzxd.c"
+sentinel_min_size_bytes = 1024
