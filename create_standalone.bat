@@ -31,7 +31,7 @@ if "%REPO_DIR:~-1%"=="\" set "REPO_DIR=%REPO_DIR:~0,-1%"
 set "STANDALONE_DIR=%REPO_DIR%\standalone"
 
 REM --- Toolchain locations (override via env) --------------------------------
-if not defined SDK_ROOT set "SDK_ROOT=C:\tmp\Workspace 1\Vulkan\RexGlue360Recomp"
+if not defined SDK_ROOT set "SDK_ROOT="
 
 REM --- 1. Build the recompiler app -------------------------------------------
 echo === BUILDING XBOX360-RECOMPILER (%BUILD_TYPE%) ===
