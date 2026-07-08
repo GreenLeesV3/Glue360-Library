@@ -149,32 +149,38 @@ echo WARNING: cmake not found on PATH - add manually.
 REM --- 5b. Generate README.txt -----------------------------------------------
 echo Writing README.txt...
 (
-    echo xbox360-recompiler - Standalone Distribution
-    echo ===========================================================
+    echo Glue360 Library - Xbox 360 Recompiler (Standalone Distribution)
+    echo ===================================================================
     echo.
     echo This tool recompiles Xbox 360 games into native Windows
-    echo executables, letting you play them without an emulator.
+    echo executables using the RexGlue360 SDK.
     echo.
     echo Requirements
     echo ------------
-    echo The only external requirement is Visual Studio 2022 with the
-    echo "Desktop development with C++" workload installed, which
-    echo provides MSVC and the Windows SDK. LLVM/clang-cl must also be
-    echo installed separately.
+    echo The only external requirements are:
+    echo   1. Visual Studio 2022 with "Desktop development with C++"
+    echo      (provides MSVC + Windows SDK)
+    echo   2. LLVM/clang-cl (install separately)
     echo.
-    echo Available profiles
-    echo ------------------
-    echo   spiderman3
-    echo   jurassic_hunted
+    echo Everything else (RexGlue SDK, CMake, Ninja, extract-xiso) is
+    echo bundled in this folder.
+    echo.
+    echo Available game profiles
+    echo -----------------------
+    echo   spiderman3       Spider-Man 3 (D3D12 + Vulkan, FSR, save system)
+    echo   jurassic_hunted  Jurassic: The Hunted (D3D12, 60 FPS unlock)
     echo.
     echo Usage
     echo -----
     echo   xbox360-recompiler.exe --iso ^<game.iso^> --output ^<dir^> --profile ^<name^>
+    echo   xbox360-recompiler.exe --iso ^<game.iso^> --output ^<dir^> --profile ^<name^> --backend vulkan
     echo.
     echo Verify your environment
     echo -----------------------
     echo   xbox360-recompiler.exe --check-deps
     echo.
+    echo For full documentation see HOW_TO_USE.txt in the source repo
+    echo or visit: https://github.com/GreenLeesV3/Glue360-Library
 ) > "%STANDALONE_DIR%\README.txt"
 
 REM --- 6. Report -------------------------------------------------------------
