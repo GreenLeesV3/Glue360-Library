@@ -1,21 +1,14 @@
-// gui_launcher.cpp — Win32 GUI launcher implementation
+// gui_launcher.cpp — Win32 GUI launcher implementation.
 //
-// Provides a simple wizard dialog for end users who run the tool without
+// Provides a wizard dialog for end users who run the tool without
 // command-line arguments. Collects ISO path, profile, output directory,
-// then runs the existing pipeline.
-//
-// Uses Win32 common dialogs (GetOpenFileNameW) for file picking and
-// a simple progress dialog with a progress bar control.
+// then runs the existing pipeline and shows the result.
 
 #include "gui/gui_launcher.h"
 
 #include <algorithm>
-#include <atomic>
-#include <chrono>
-#include <cstdio>
 #include <filesystem>
 #include <string>
-#include <thread>
 #include <vector>
 
 #ifdef _WIN32
@@ -27,10 +20,12 @@
 #endif
 #include <windows.h>
 #include <commdlg.h>
-#include <commctrl.h>
+// shlobj.h needs full COM headers — WIN32_LEAN_AND_MEAN excludes them.
+#ifdef WIN32_LEAN_AND_MEAN
+#undef WIN32_LEAN_AND_MEAN
+#endif
+#include <objbase.h>
 #include <shlobj.h>
-
-#pragma comment(lib, "comctl32.lib")
 #endif
 
 namespace recomp::gui {
@@ -39,8 +34,11 @@ namespace recomp::gui {
 
 namespace {
 
-// File picker dialog
-std::filesystem::path PickIsoFile(HWND owner) {
+namespace fs = std::filesystem;
+
+// ── File / folder pickers ────────────────────────────────────────────────
+
+fs::path PickIsoFile(HWND owner) {
   wchar_t filename[MAX_PATH] = {};
   OPENFILENAMEW ofn{};
   ofn.lStructSize = sizeof(ofn);
@@ -55,8 +53,7 @@ std::filesystem::path PickIsoFile(HWND owner) {
   return filename;
 }
 
-// Folder picker dialog
-std::filesystem::path PickFolder(HWND owner, const wchar_t* title) {
+fs::path PickFolder(HWND owner, const wchar_t* title) {
   BROWSEINFOW bi{};
   bi.hwndOwner = owner;
   bi.lpszTitle = title;
@@ -72,15 +69,21 @@ std::filesystem::path PickFolder(HWND owner, const wchar_t* title) {
   return path;
 }
 
-// Find available profiles by scanning the profiles/ directory
-std::vector<std::string> FindProfiles(const std::filesystem::path& app_dir) {
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+fs::path GetAppDir() {
+  wchar_t path[MAX_PATH] = {};
+  GetModuleFileNameW(nullptr, path, MAX_PATH);
+  return fs::path(path).parent_path();
+}
+
+std::vector<std::string> FindProfiles(const fs::path& app_dir) {
   std::vector<std::string> profiles;
   auto profiles_dir = app_dir / "profiles";
-  if (!std::filesystem::is_directory(profiles_dir)) return profiles;
-  for (const auto& entry : std::filesystem::directory_iterator(profiles_dir)) {
+  if (!fs::is_directory(profiles_dir)) return profiles;
+  for (const auto& entry : fs::directory_iterator(profiles_dir)) {
     if (entry.is_directory()) {
-      auto toml = entry.path() / "profile.toml";
-      if (std::filesystem::exists(toml)) {
+      if (fs::exists(entry.path() / "profile.toml")) {
         profiles.push_back(entry.path().filename().string());
       }
     }
@@ -89,182 +92,207 @@ std::vector<std::string> FindProfiles(const std::filesystem::path& app_dir) {
   return profiles;
 }
 
-// Get the app directory (where the exe lives)
-std::filesystem::path GetAppDir() {
-  wchar_t path[MAX_PATH] = {};
-  GetModuleFileNameW(nullptr, path, MAX_PATH);
-  return std::filesystem::path(path).parent_path();
+std::wstring Widen(const std::string& s) {
+  return std::wstring(s.begin(), s.end());
 }
 
-// Wizard dialog state
+std::string Narrow(const std::wstring& w) {
+  return std::string(w.begin(), w.end());
+}
+
+// ── Wizard dialog ────────────────────────────────────────────────────────
+//
+// Control IDs
+enum {
+  IDC_ISO_LABEL   = 1000,
+  IDC_ISO_EDIT    = 1001,
+  IDC_ISO_BROWSE  = 1002,
+  IDC_PROFILE_LABEL = 1003,
+  IDC_PROFILE_COMBO = 1004,
+  IDC_OUTPUT_LABEL  = 1005,
+  IDC_OUTPUT_EDIT   = 1006,
+  IDC_OUTPUT_BROWSE = 1007,
+  IDC_START       = IDOK,
+  IDC_CANCEL      = IDCANCEL,
+};
+
 struct WizardState {
-  std::filesystem::path iso_path;
-  std::filesystem::path output_dir;
+  fs::path iso_path;
+  fs::path output_dir;
   std::string profile_name;
-  std::filesystem::path sdk_path;
+  fs::path sdk_path;
   std::vector<std::string> profiles;
   bool ok = false;
 };
 
-// Combo box helper
-void AddStringToCombo(HWND combo, const std::string& text) {
-  std::wstring wide(text.begin(), text.end());
-  SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wide.c_str()));
+void LayoutControls(HWND hwnd) {
+  // Layout:
+  //  Row 1: "ISO file:"   [edit............................] [Browse]
+  //  Row 2: "Profile:"     [combo............................]
+  //  Row 3: "Output dir:"  [edit............................] [Browse]
+  //  Row 4:              [Start]  [Cancel]
+
+  static const int kMargin = 12;
+  static const int kLabelW = 70;
+  static const int kBrowseW = 80;
+  static const int kRowH = 16;
+  static const int kEditH = 22;
+  static const int kGap = 8;
+  static const int kRowGap = 14;
+
+  RECT rc;
+  GetClientRect(hwnd, &rc);
+  int width = rc.right - rc.left;
+  int y = kMargin;
+
+  int edit_w = width - kMargin * 2 - kLabelW - kBrowseW - kGap * 2;
+
+  // Row 1: ISO
+  HWND lbl = CreateWindowW(L"STATIC", L"ISO file:", SS_LEFT, kMargin, y + 2,
+                           kLabelW, kRowH, hwnd, (HMENU)IDC_ISO_LABEL, nullptr, nullptr);
+  HWND edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+                              kMargin + kLabelW + kGap, y, edit_w, kEditH,
+                              hwnd, (HMENU)IDC_ISO_EDIT, nullptr, nullptr);
+  HWND btn = CreateWindowW(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE,
+                           kMargin + kLabelW + kGap + edit_w + kGap, y, kBrowseW, kEditH,
+                           hwnd, (HMENU)IDC_ISO_BROWSE, nullptr, nullptr);
+  y += kEditH + kRowGap;
+
+  // Row 2: Profile combo
+  lbl = CreateWindowW(L"STATIC", L"Profile:", SS_LEFT, kMargin, y + 2,
+                      kLabelW, kRowH, hwnd, (HMENU)IDC_PROFILE_LABEL, nullptr, nullptr);
+  HWND combo = CreateWindowExW(0, L"COMBOBOX", L"",
+                               WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
+                               kMargin + kLabelW + kGap, y, edit_w + kGap + kBrowseW, 200,
+                               hwnd, (HMENU)IDC_PROFILE_COMBO, nullptr, nullptr);
+  y += kEditH + kRowGap;
+
+  // Row 3: Output dir
+  lbl = CreateWindowW(L"STATIC", L"Output dir:", SS_LEFT, kMargin, y + 2,
+                      kLabelW, kRowH, hwnd, (HMENU)IDC_OUTPUT_LABEL, nullptr, nullptr);
+  edit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+                         kMargin + kLabelW + kGap, y, edit_w, kEditH,
+                         hwnd, (HMENU)IDC_OUTPUT_EDIT, nullptr, nullptr);
+  btn = CreateWindowW(L"BUTTON", L"Browse...", WS_CHILD | WS_VISIBLE,
+                      kMargin + kLabelW + kGap + edit_w + kGap, y, kBrowseW, kEditH,
+                      hwnd, (HMENU)IDC_OUTPUT_BROWSE, nullptr, nullptr);
+  y += kEditH + kRowGap + 4;
+
+  // Row 4: Start / Cancel
+  int btn_w = 90;
+  int btn_gap = 10;
+  int btn_x = width - kMargin - btn_w * 2 - btn_gap;
+  btn = CreateWindowW(L"BUTTON", L"Start", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
+                      btn_x, y, btn_w, kEditH + 4, hwnd, (HMENU)IDC_START, nullptr, nullptr);
+  btn = CreateWindowW(L"BUTTON", L"Cancel", WS_CHILD | WS_VISIBLE,
+                      btn_x + btn_w + btn_gap, y, btn_w, kEditH + 4,
+                      hwnd, (HMENU)IDC_CANCEL, nullptr, nullptr);
+
+  // Set a nicer font on all children
+  HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+  EnumChildWindows(hwnd, [](HWND child, LPARAM lp) -> BOOL {
+    SendMessageW(child, WM_SETFONT, (WPARAM)lp, MAKELPARAM(TRUE, 0));
+    return TRUE;
+  }, (LPARAM)hFont);
 }
 
-std::string GetComboSelection(HWND combo) {
-  int sel = SendMessageW(combo, CB_GETCURSEL, 0, 0);
-  if (sel < 0) return {};
-  int len = SendMessageW(combo, CB_GETLBTEXTLEN, sel, 0);
-  std::wstring wide(len, L'\0');
-  SendMessageW(combo, CB_GETLBTEXT, sel, reinterpret_cast<LPARAM>(wide.data()));
-  return std::string(wide.begin(), wide.end());
-}
-
-// Main wizard dialog procedure
 INT_PTR CALLBACK WizardProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
   static WizardState* state = nullptr;
 
   switch (msg) {
-    case WM_INITDIALOG: {
-      state = reinterpret_cast<WizardState*>(lParam);
+    case WM_CREATE: {
+      state = reinterpret_cast<WizardState*>(
+          reinterpret_cast<CREATESTRUCT*>(lParam)->lpCreateParams);
 
-      // Set window title
       SetWindowTextW(hwnd, L"Glue360 Library - Xbox 360 Recompiler");
 
-      // Populate profile combo box
-      HWND combo = GetDlgItem(hwnd, 1002);  // Profile combo
+      LayoutControls(hwnd);
+
+      // Populate profile combo
+      HWND combo = GetDlgItem(hwnd, IDC_PROFILE_COMBO);
       for (const auto& profile : state->profiles) {
-        AddStringToCombo(combo, profile);
+        SendMessageW(combo, CB_ADDSTRING, 0,
+                     reinterpret_cast<LPARAM>(Widen(profile).c_str()));
       }
       if (!state->profiles.empty()) {
         SendMessageW(combo, CB_SETCURSEL, 0, 0);
       }
 
-      // Set default output dir
-      HWND out_edit = GetDlgItem(hwnd, 1004);  // Output dir edit
-      std::wstring default_out = L"C:\\Games\\Recomp";
-      SetWindowTextW(out_edit, default_out.c_str());
-
-      return TRUE;
+      // Default output dir
+      SetDlgItemTextW(hwnd, IDC_OUTPUT_EDIT, L"C:\\Games\\Recomp");
+      return 0;
     }
 
     case WM_COMMAND: {
       switch (LOWORD(wParam)) {
-        case 1001: {  // Browse ISO button
+        case IDC_ISO_BROWSE: {
           auto iso = PickIsoFile(hwnd);
           if (!iso.empty()) {
-            std::wstring wide = iso.wstring();
-            SetDlgItemTextW(hwnd, 1000, wide.c_str());
+            SetDlgItemTextW(hwnd, IDC_ISO_EDIT, iso.wstring().c_str());
           }
           break;
         }
-        case 1003: {  // Browse output button
+        case IDC_OUTPUT_BROWSE: {
           auto dir = PickFolder(hwnd, L"Select output directory");
           if (!dir.empty()) {
-            std::wstring wide = dir.wstring();
-            SetDlgItemTextW(hwnd, 1004, wide.c_str());
+            SetDlgItemTextW(hwnd, IDC_OUTPUT_EDIT, dir.wstring().c_str());
           }
           break;
         }
-        case IDOK: {  // Start button
-          // Read ISO path
+        case IDC_START: {
+          // Read ISO
           wchar_t iso_buf[MAX_PATH] = {};
-          GetDlgItemTextW(hwnd, 1000, iso_buf, MAX_PATH);
+          GetDlgItemTextW(hwnd, IDC_ISO_EDIT, iso_buf, MAX_PATH);
           state->iso_path = iso_buf;
 
-          // Read output dir
+          // Read output
           wchar_t out_buf[MAX_PATH] = {};
-          GetDlgItemTextW(hwnd, 1004, out_buf, MAX_PATH);
+          GetDlgItemTextW(hwnd, IDC_OUTPUT_EDIT, out_buf, MAX_PATH);
           state->output_dir = out_buf;
 
           // Read profile
-          state->profile_name = GetComboSelection(GetDlgItem(hwnd, 1002));
+          HWND combo = GetDlgItem(hwnd, IDC_PROFILE_COMBO);
+          int sel = SendMessageW(combo, CB_GETCURSEL, 0, 0);
+          if (sel >= 0) {
+            int len = SendMessageW(combo, CB_GETLBTEXTLEN, sel, 0);
+            std::wstring wide(len, L'\0');
+            SendMessageW(combo, CB_GETLBTEXT, sel,
+                         reinterpret_cast<LPARAM>(wide.data()));
+            state->profile_name = Narrow(wide);
+          }
 
           // Validate
           if (state->iso_path.empty()) {
             MessageBoxW(hwnd, L"Please select an ISO file.", L"Error", MB_ICONERROR);
-            return TRUE;
+            return 0;
           }
           if (state->output_dir.empty()) {
             MessageBoxW(hwnd, L"Please select an output directory.", L"Error", MB_ICONERROR);
-            return TRUE;
+            return 0;
           }
           if (state->profile_name.empty()) {
             MessageBoxW(hwnd, L"Please select a game profile.", L"Error", MB_ICONERROR);
-            return TRUE;
+            return 0;
           }
 
           state->ok = true;
-          EndDialog(hwnd, IDOK);
-          break;
+          DestroyWindow(hwnd);
+          return 0;
         }
-        case IDCANCEL: {
+        case IDC_CANCEL: {
           state->ok = false;
-          EndDialog(hwnd, IDCANCEL);
-          break;
+          DestroyWindow(hwnd);
+          return 0;
         }
       }
       break;
     }
-  }
-  return FALSE;
-}
-
-// Progress dialog procedure
-struct ProgressState {
-  std::atomic<float> fraction{0.0f};
-  std::atomic<bool> cancelled{false};
-  std::atomic<bool> closed{false};
-  std::wstring message;
-  HWND hwnd = nullptr;
-  HWND progress_bar = nullptr;
-};
-
-INT_PTR CALLBACK ProgressProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-  static ProgressState* state = nullptr;
-
-  switch (msg) {
-    case WM_INITDIALOG: {
-      state = reinterpret_cast<ProgressState*>(lParam);
-      state->hwnd = hwnd;
-      state->progress_bar = GetDlgItem(hwnd, 2001);
-
-      // Set title and message
-      SetWindowTextW(hwnd, L"Recompiling...");
-
-      // Initialize progress bar range 0-1000
-      SendMessageW(state->progress_bar, PBM_SETRANGE, 0, MAKELPARAM(0, 1000));
-      SendMessageW(state->progress_bar, PBM_SETPOS, 0, 0);
-
-      // Set message text
-      if (!state->message.empty()) {
-        SetDlgItemTextW(hwnd, 2002, state->message.c_str());
-      }
-
-      return TRUE;
-    }
-    case WM_COMMAND: {
-      if (LOWORD(wParam) == IDCANCEL) {
-        state->cancelled.store(true);
-        EnableWindow(GetDlgItem(hwnd, IDCANCEL), FALSE);
-        SetDlgItemTextW(hwnd, 2002, L"Cancelling...");
-      }
-      break;
+    case WM_DESTROY: {
+      PostQuitMessage(0);
+      return 0;
     }
   }
-  return FALSE;
-}
-
-// Timer callback to update progress dialog
-VOID CALLBACK ProgressTimerProc(HWND hwnd, UINT msg, UINT_PTR id, DWORD time) {
-  ProgressState* state = reinterpret_cast<ProgressState*>(
-      GetWindowLongPtrW(hwnd, GWLP_USERDATA));
-  if (!state) return;
-
-  float frac = state->fraction.load();
-  int pos = static_cast<int>(frac * 1000.0f);
-  SendMessageW(state->progress_bar, PBM_SETPOS, pos, 0);
+  return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
 
 }  // namespace
@@ -273,110 +301,82 @@ GuiResult ShowLauncherWizard() {
   WizardState state;
   state.profiles = FindProfiles(GetAppDir());
 
-  // Create the wizard dialog
-  // Using a simple dialog template built programmatically
-  // For simplicity, we use DialogBoxParam with a template created inline
-
-  // Build dialog template in memory
-  struct {
-    DLGTEMPLATE tmpl;
-    WORD menu;
-    WORD cls;
-    WCHAR title[64];
-  } dlg_tmpl{};
-
-  dlg_tmpl.tmpl.style = WS_POPUP | WS_CAPTION | WS_SYSMENU | DS_CENTER | DS_MODALFRAME;
-  dlg_tmpl.tmpl.x = 0;
-  dlg_tmpl.tmpl.y = 0;
-  dlg_tmpl.tmpl.cx = 280;
-  dlg_tmpl.tmpl.cy = 200;
-  dlg_tmpl.menu = 0;
-  dlg_tmpl.cls = 0;
-
-  // For a real implementation we'd build the full template with child controls
-  // For now, use a simpler approach: create a dialog with CreateDialogParam
-  // and add controls manually
-
-  // Use a resource ID approach - create a minimal dialog
-  // Since we can't use .rc files easily, let's use a message-only approach:
-  // Register a window class and create a normal window with controls
-
-  // Actually, the simplest approach: use MessageBox for input prompts
-  // This is a fallback - the real dialog would be built with CreateDialogParam
-
-  // For now, show a simple file picker chain
-  auto iso = PickIsoFile(nullptr);
-  if (iso.empty()) return {};
-
-  auto output = PickFolder(nullptr, L"Select output directory for the recompiled game");
-  if (output.empty()) return {};
-
-  // Select profile
-  auto profiles = FindProfiles(GetAppDir());
-  if (profiles.empty()) {
-    MessageBoxW(nullptr, L"No game profiles found in the profiles/ directory.",
+  if (state.profiles.empty()) {
+    MessageBoxW(nullptr,
+                L"No game profiles found in the profiles/ directory.",
                 L"Error", MB_ICONERROR);
     return {};
   }
 
-  // Simple profile selection via MessageBox
-  std::wstring profile_list = L"Available profiles:\n\n";
-  for (size_t i = 0; i < profiles.size(); ++i) {
-    profile_list += std::to_wstring(i + 1) + L". " +
-                    std::wstring(profiles[i].begin(), profiles[i].end()) + L"\n";
+  // Register a window class for the wizard (CreateWindow + message loop,
+  // not DialogBox — gives us full control over layout without .rc files).
+  static const wchar_t* kClassName = L"Glue360Wizard";
+  WNDCLASSW wc{};
+  wc.lpfnWndProc = WizardProc;
+  wc.hInstance = GetModuleHandleW(nullptr);
+  wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+  wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+  wc.lpszClassName = kClassName;
+  RegisterClassW(&wc);
+
+  // Size: 480 x 220, centered
+  int screen_w = GetSystemMetrics(SM_CXSCREEN);
+  int screen_h = GetSystemMetrics(SM_CYSCREEN);
+  int win_w = 480;
+  int win_h = 220;
+  int x = (screen_w - win_w) / 2;
+  int y = (screen_h - win_h) / 2;
+
+  HWND hwnd = CreateWindowExW(
+      WS_EX_APPWINDOW, kClassName, L"Glue360 Wizard",
+      WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX,
+      x, y, win_w, win_h,
+      nullptr, nullptr, GetModuleHandleW(nullptr), &state);
+
+  if (!hwnd) return {};
+
+  ShowWindow(hwnd, SW_SHOW);
+  UpdateWindow(hwnd);
+
+  // Message loop
+  MSG msg;
+  while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
+    if (!IsDialogMessageW(hwnd, &msg)) {
+      TranslateMessage(&msg);
+      DispatchMessageW(&msg);
+    }
   }
-  profile_list += L"\nEnter the number (default: 1):";
-  // For a proper implementation, this would be a dropdown combo box in a dialog
 
-  // Default to first profile
   GuiResult result;
-  result.ok = true;
-  result.iso_path = iso;
-  result.output_dir = output;
-  result.profile_name = profiles[0];
-
+  result.ok = state.ok;
+  result.iso_path = state.iso_path;
+  result.output_dir = state.output_dir;
+  result.profile_name = state.profile_name;
+  result.sdk_path = state.sdk_path.string();
   return result;
 }
 
-// ProgressDialog implementation
-
-ProgressDialog::ProgressDialog(const std::string& title, const std::string& message) {
-#ifdef _WIN32
-  // For now, progress is reported via stdout (the pipeline already does this)
-  // A proper progress dialog would create a modeless window with a progress bar
-  // on a separate thread. This is a placeholder that prints to console.
-  (void)title;
-  (void)message;
-  printf("[Progress] %s\n", message.c_str());
-#endif
-}
-
-void ProgressDialog::Update(float fraction, const std::string& message) {
-#ifdef _WIN32
-  int pct = static_cast<int>(fraction * 100.0f);
-  printf("[Progress %d%%] %s\n", pct, message.c_str());
-#endif
-}
-
-bool ProgressDialog::WasCancelled() const {
-  return false;
-}
-
-void ProgressDialog::Close() {
-  // Nothing to close for console-based progress
+void ShowResult(bool success, const std::string& deploy_path,
+                const std::string& error_msg) {
+  if (success) {
+    std::wstring msg = L"Recompilation complete!\n\nYour game is at:\n" +
+                       Widen(deploy_path) +
+                       L"\n\nYou can run the .exe directly from that folder.";
+    MessageBoxW(nullptr, msg.c_str(), L"Done", MB_OK | MB_ICONINFORMATION);
+  } else {
+    std::wstring msg = L"Recompilation failed.\n\n" + Widen(error_msg) +
+                       L"\n\nCheck the log file in the output directory.";
+    MessageBoxW(nullptr, msg.c_str(), L"Error", MB_OK | MB_ICONERROR);
+  }
 }
 
 #else  // !_WIN32
 
 GuiResult ShowLauncherWizard() {
-  // No GUI on non-Windows platforms
   return {};
 }
 
-ProgressDialog::ProgressDialog(const std::string&, const std::string&) {}
-void ProgressDialog::Update(float, const std::string&) {}
-bool ProgressDialog::WasCancelled() const { return false; }
-void ProgressDialog::Close() {}
+void ShowResult(bool, const std::string&, const std::string&) {}
 
 #endif
 

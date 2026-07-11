@@ -188,7 +188,7 @@ void register_stages(recomp::Orchestrator& orch) {
     orch.register_stage(std::make_shared<recomp::DeployerStage>());
 }
 
-int run_pipeline(const Args& a) {
+int run_pipeline(const Args& a, bool gui_mode = false) {
     using recomp::PipelineContext;
     using recomp::StateStore;
     using recomp::Orchestrator;
@@ -217,7 +217,7 @@ int run_pipeline(const Args& a) {
             std::cerr << "error: --backend must be 'd3d12' or 'vulkan'\n";
             return 2;
         }
-    } else if (!a.check_deps) {
+    } else if (!a.check_deps && !gui_mode) {
         // Interactive prompt
         std::cout << "\nSelect graphics backend:\n"
                   << "  [1] D3D12  (recommended, best performance on AMD/NVIDIA Windows)\n"
@@ -382,15 +382,20 @@ int run_pipeline(const Args& a) {
     register_stages(orch);
 
     bool ok = orch.run();
+    std::string deploy_path = ctx.deploy_dir.string();
+    std::string log_path = (ctx.log_dir() / "recomp.log").string();
+
     if (ok) {
         Logger::info("Pipeline succeeded.");
-        std::cout << "\nPipeline succeeded. Output: " << ctx.deploy_dir.string()
-                  << "\n";
+        std::cout << "\nPipeline succeeded. Output: " << deploy_path << "\n";
     } else {
         Logger::error("Pipeline failed.");
-        std::cout << "\nPipeline failed. See "
-                  << (ctx.log_dir() / "recomp.log").string()
-                  << " for details.\n";
+        std::cout << "\nPipeline failed. See " << log_path << " for details.\n";
+    }
+
+    if (gui_mode) {
+        recomp::gui::ShowResult(ok, deploy_path,
+                                ok ? "" : "See " + log_path + " for details.");
     }
 
     Logger::shutdown();
@@ -417,7 +422,7 @@ int main(int argc, char** argv) {
             if (!gui_result.sdk_path.empty()) {
                 a.sdk = gui_result.sdk_path;
             }
-            return run_pipeline(a);
+            return run_pipeline(a, true);
         }
 #endif
         print_help();

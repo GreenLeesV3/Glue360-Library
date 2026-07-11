@@ -32,28 +32,10 @@ struct GuiResult {
 // Blocks until the user clicks Start or Cancel
 GuiResult ShowLauncherWizard();
 
-// Show a progress dialog during a long-running operation
-// Uses a Win32 progress bar dialog
-class ProgressDialog {
- public:
-  // Create and show the progress dialog
-  // title: window title, message: status text
-  ProgressDialog(const std::string& title, const std::string& message);
+// Show a completion message box with the game exe path (or error).
+// Called by main.cpp after the pipeline finishes in GUI mode.
+void ShowResult(bool success, const std::string& deploy_path,
+                const std::string& error_msg);
 
-  // Update progress (0.0 to 1.0) and optional status message
-  void Update(float fraction, const std::string& message);
-
-  // Check if the user clicked Cancel
-  bool WasCancelled() const;
-
-  // Close the dialog
-  void Close();
-
- private:
-#ifdef _WIN32
-  void* hwnd_ = nullptr;  // HWND
-  bool cancelled_ = false;
-#endif
-};
 
 }  // namespace recomp::gui

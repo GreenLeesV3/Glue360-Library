@@ -164,7 +164,7 @@ if(WIN32)
         user32        # window management, message loop
         comdlg32      # file picker dialogs (GetOpenFileNameW)
         comctl32      # progress bar controls
-        winhttp       # title update downloads
+        # winhttp removed — title_update_downloader (the only consumer) was dead code
     )
 endif()
 

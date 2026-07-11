@@ -100,7 +100,7 @@ pushd "%STANDALONE_DIR%\sdk\bin" 2>nul
 if errorlevel 1 (
     echo WARNING: sdk\bin\ not found - skipping DLL trim.
 ) else (
-    del /Q TracyClientd.dll TracyClientrd.dll rexruntimed.dll rexruntimerd.dll 2>nul
+    del /Q TracyClientd.dll TracyClientrd.dll rexruntimed.dll 2>nul
     popd
 )
 
