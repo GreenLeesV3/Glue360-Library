@@ -2,7 +2,9 @@
 REM ============================================================================
 REM  create_standalone.bat — assemble a fully standalone xbox360-recompiler
 REM  distribution that needs only VS 2022 ("Desktop development with C++")
-REM  installed on the target machine.
+REM  The SDK must be the D3D12 build (REX_HAS_D3D12=1, links dxc-headers).
+REM  The Vulkan-build SDK (REX_HAS_VULKAN=1) will NOT work — it causes a
+REM  black screen because rexruntime.lib only contains D3D12 symbols.
 REM
 REM  Layout produced:
 REM    standalone/
