@@ -1,5 +1,5 @@
 ================================================================================
-  Glue360 Library — Xbox 360 Recompiler v1.1 — How To Use
+  Glue360 Library — Xbox 360 Recompiler v1.2 — How To Use
 ================================================================================
 
 This tool recompiles Xbox 360 game ISOs into native Windows executables
@@ -19,48 +19,35 @@ SUPPORTED GAMES
     - 171 function boundary hints, setjmp/longjmp fix, switch table override
     - Uses prebuilt SDK (no source build needed)
 
-
-PREREQUISITES
--------------
-
-1. Xbox 360 game ISO (.iso file) for a supported title
-
-2. RexGlue360 SDK (prebuilt) — a folder containing:
-     bin/rexglue.exe, bin/rexruntime.dll, bin/TracyClient.dll
-     include/, lib/, share/
-   OR use the standalone distribution which bundles the SDK at sdk/
-
-3. RexGlue SDK source code (OPTIONAL — only needed for profiles with
-   runtime patches like Spider-Man 3). The source tree must have
-   thirdparty/ submodules populated.
-
-4. Build tools:
-     - Visual Studio 2022 with "Desktop development with C++" workload
-       (provides MSVC 14.40+ + Windows SDK 10.0+)
-     - LLVM/clang-cl 16+ (install separately)
-     - CMake 3.25+ (bundled in standalone dist at tools/cmake/)
-     - Ninja 1.11+ (bundled in standalone dist at tools/ninja.exe)
-     - extract-xiso (bundled in standalone dist at tools/extract-xiso.exe)
+  Spider-Man: Web of Shadows (Title ID 41560815)  Profile: spiderman_wos
+    - D3D12 backend, RTV render path
+    - 148 function hints for virtual dispatch thunks
+    - RTV black screen fix via execute_unclipped_draw_vs_on_cpu
+    - Skate3-style performance cvars
+    - 60 FPS unlock, shader cache
+    - Uses prebuilt SDK (no source build needed)
 
 
 QUICK START
 -----------
 
+  Using the GUI launcher (double-click):
+  =======================================
+  Just run xbox360-recompiler.exe with no arguments. A file picker wizard
+  will guide you through selecting the ISO, output folder, and game profile.
+
   Using the standalone distribution:
   ==================================
-
   xbox360-recompiler.exe ^
       --iso  "path\to\game.iso" ^
       --output "path\to\output-folder" ^
-      --profile spiderman3 ^
-      --backend d3d12
+      --profile spiderman_wos
 
   The standalone distribution auto-discovers the bundled SDK at sdk/ and
   bundled tools at tools/. No --sdk flag needed.
 
   Building from source:
   ====================
-
   1. Build the app:
      set SDK_ROOT=path\to\RexGlue360Recomp
      build.bat
@@ -73,12 +60,10 @@ QUICK START
          --iso  "path\to\game.iso" ^
          --output "path\to\output" ^
          --sdk   "path\to\RexGlue360Recomp" ^
-         --profile spiderman3 ^
-         --backend d3d12
+         --profile spiderman_wos
 
   For Spider-Man 3 with custom runtime (save system patches):
   ===========================================================
-
   xbox360-recompiler.exe ^
       --iso  "path\to\Spider-Man 3.iso" ^
       --output "path\to\output" ^
@@ -89,7 +74,6 @@ QUICK START
 
   For Jurassic: The Hunted (prebuilt SDK, no source needed):
   ==========================================================
-
   xbox360-recompiler.exe ^
       --iso  "path\to\Jurassic.iso" ^
       --output "path\to\output" ^
@@ -126,7 +110,7 @@ COMMAND-LINE OPTIONS
                           d3d12  — Direct3D 12 (default, recommended).
                           vulkan — Vulkan 1.2+ (experimental, SP3 only).
   --profile <name>      Game profile name (default: spiderman3).
-                        Available: spiderman3, jurassic_hunted.
+                        Available: spiderman3, jurassic_hunted, spiderman_wos.
   --clean               Wipe state and stage outputs before running.
   --resume              Resume from the last completed stage.
   --check-deps          Run only the dependency checker and print a report.
@@ -136,11 +120,11 @@ COMMAND-LINE OPTIONS
 PIPELINE STAGES
 ---------------
 
-  1. iso_extract      Extract the XGD2 ISO via extract-xiso.
+  1. iso_extract      Extract Xbox 360 ISO (built-in XDVDFS reader, extract-xiso fallback).
   2. rexglue_init     Create the recompilation project (rexglue init).
                       Injects function boundaries, setjmp/longjmp, switch
                       tables, and invalid instruction hints from the profile.
-  3. rexglue_codegen  PPC -> C++ code generation.
+  3. rexglue_codegen  PPC to C++ code generation.
   4. apply_patches    Copy profile source files + apply runtime patches.
   5. build_runtime    Build custom rexruntime.dll (skipped if no SDK source
                       or profile has requires_sdk_source=false).
@@ -150,28 +134,6 @@ PIPELINE STAGES
   7. deploy           Assemble portable standalone folder.
 
 
-BUILD OPTIMIZATIONS
--------------------
-
-The recompiler applies several build optimizations borrowed from other
-recomp projects:
-
-  - LTO for Release only (CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=ON)
-    Inspired by UnleashedRecomp. Smaller exe, better optimization.
-
-  - Static MSVC runtime (CMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded)
-    Inspired by Skate3Recomp. Eliminates VC++ redistributable dependency.
-    Only applied when requires_sdk_source=true (SDK built from source for
-    /MT consistency). Prebuilt SDK uses /MD, so mixing causes LNK2038.
-
-  - ccache auto-detection (CMAKE_CXX_COMPILER_LAUNCHER=ccache)
-    If ccache is on PATH, it's used for faster incremental rebuilds.
-
-  - AVX CPU targeting (-march=x86-64-v3 via CMAKE_CXX_FLAGS)
-    Optional via build_options.cpu_target in profile.toml. Enables AVX2/BMI2
-    for better PPC SIMD (Altivec/VMX) matching.
-
-
 TROUBLESHOOTING
 ---------------
 
@@ -179,15 +141,13 @@ TROUBLESHOOTING
     -> Use the standalone distribution (bundles SDK at sdk/), or pass
        --sdk pointing at your RexGlue360Recomp folder.
 
-  "extract-xiso: [SOFT] (missing)"
-    -> Bundled at tools/extract-xiso.exe in the standalone dist. If building
-       from source, download extract-xiso and place it at tools/.
+  "RTV black screen" (Spider-Man: Web of Shadows)
+    -> The game needs execute_unclipped_draw_vs_on_cpu = true to prevent
+       EDRAM ownership transfer corruption. This is already in the profile.
 
-  "MSVC environment unavailable"
-    -> Install Visual Studio 2022 with "Desktop development with C++".
-
-  "clang-cl is not found in PATH"
-    -> Install LLVM. The app checks C:\Program Files\LLVM\bin\ as fallback.
+  "Call to invalid or unregistered function at 0xXXXXXXXX"
+    -> The codegen scanner missed a function. Add the address as a function
+       hint in the profile's [functions] section, re-run codegen, rebuild.
 
   Stage fails, want to debug:
     -> Check <output>\.recomp\logs\recomp.log for detailed error messages.
