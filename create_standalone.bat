@@ -75,7 +75,7 @@ xcopy /E /I /Q /Y "%SDK_ROOT%\bin" "%STANDALONE_DIR%\sdk\bin" >nul
 xcopy /E /I /Q /Y "%SDK_ROOT%\cmake" "%STANDALONE_DIR%\sdk\cmake" >nul
 xcopy /E /I /Q /Y "%SDK_ROOT%\include" "%STANDALONE_DIR%\sdk\include" >nul
 xcopy /E /I /Q /Y "%SDK_ROOT%\lib" "%STANDALONE_DIR%\sdk\lib" >nul
-if exist "%SDK_ROOT%\licenses" xcopy /E /I /Q /Y "%SDK_ROOT%\licenses" "%STANDALONE_DIR%\sdk\licenses" >nul
+if exist "%SDK_ROOT%\share" xcopy /E /I /Q /Y "%SDK_ROOT%\share" "%STANDALONE_DIR%\sdk\share" >nul
 goto :sdk_done
 
 :sdk_missing
@@ -85,24 +85,15 @@ exit /b 1
 
 :sdk_done
 
-REM --- 4b. Trim debug/relwithdebinfo artifacts from the SDK ------------------
-echo Trimming debug lib variants from sdk/lib/...
-pushd "%STANDALONE_DIR%\sdk\lib" 2>nul
-if errorlevel 1 (
-    echo WARNING: sdk\lib\ not found - skipping lib trim.
-) else (
-    del /Q *d.lib *rd.lib 2>nul
-    popd
-)
+REM --- 4b. Do NOT trim debug/relwithdebinfo lib variants ---------------------
+REM The SDK's CMake config files (fmt-targets.cmake, spdlog-targets.cmake,
+REM rexglueConfig.cmake) reference *d.lib and *rd.lib for all configurations.
+REM Trimming them breaks find_package(rexglue CONFIG) at game configure time.
+REM Keep all .lib variants — the size cost (~200MB) is outweighed by correctness.
 
-echo Trimming debug DLLs from sdk/bin/...
-pushd "%STANDALONE_DIR%\sdk\bin" 2>nul
-if errorlevel 1 (
-    echo WARNING: sdk\bin\ not found - skipping DLL trim.
-) else (
-    del /Q TracyClientd.dll TracyClientrd.dll rexruntimed.dll 2>nul
-    popd
-)
+REM Do NOT trim debug DLLs from sdk/bin/ — rexglueTargets.cmake references
+REM rexruntimed.dll, rexruntimerd.dll, TracyClientd.dll, TracyClientrd.dll
+REM for all configurations. Trimming them breaks find_package(rexglue CONFIG).
 
 REM --- 5. Copy bundled tools -------------------------------------------------
 mkdir "%STANDALONE_DIR%\tools" 2>nul

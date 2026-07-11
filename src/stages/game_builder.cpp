@@ -103,6 +103,9 @@ StageResult GameBuilderStage::run(PipelineContext& ctx, ProgressCallback progres
       "-DCMAKE_C_COMPILER=" + ctx.toolchain.clang_cl_exe.string(),
       "-DCMAKE_CXX_COMPILER=" + ctx.toolchain.clang_cl_exe.string(),
   };
+  // Vulkan disable is handled by patch_applier injecting
+  // set_property(TARGET rex::runtime PROPERTY INTERFACE_COMPILE_DEFINITIONS "")
+  // into the generated CMakeLists.txt for D3D12-only games.
 
   // Static MSVC runtime — only safe when the SDK is built from source so all
   // targets share the same /MT runtime. The prebuilt SDK was compiled with
@@ -125,25 +128,10 @@ StageResult GameBuilderStage::run(PipelineContext& ctx, ProgressCallback progres
     configure_args.push_back("-DCMAKE_CXX_FLAGS=-march=" + ctx.profile.build_options.cpu_target);
   }
 
-  // ccache — if available on PATH, use it as the compiler launcher to speed
-  // up incremental rebuilds (UnleashedRecomp CI pattern). Silently skipped
-  // if ccache is not installed.
-  if (ctx.toolchain.git_exe.empty() == false) {  // quick env sanity check
-    // Use _popen to check for ccache (same pattern as dependency_checker.cpp).
-    std::string ccache_out;
-    FILE* pipe = _popen("where ccache 2>nul", "r");
-    if (pipe) {
-      std::array<char, 256> buf{};
-      while (fgets(buf.data(), static_cast<int>(buf.size()), pipe))
-        ccache_out += buf.data();
-      _pclose(pipe);
-    }
-    if (!ccache_out.empty()) {
-      configure_args.push_back("-DCMAKE_CXX_COMPILER_LAUNCHER=ccache");
-      configure_args.push_back("-DCMAKE_C_COMPILER_LAUNCHER=ccache");
-      progress(0.05f, "ccache detected — enabled for incremental rebuilds");
-    }
-  }
+  // NOTE: ccache disabled — it wraps the compiler launcher but can't resolve
+  // clang-cl.exe through the MSVC env, causing "CreateProcess failed" errors.
+  // The build is one-shot; incremental rebuilds use --resume which skips
+  // completed stages entirely.
   // Explicitly point CMAKE_LINKER to MSVC's link.exe — MinGW's ld.exe (from
   // WinLibs Ninja distribution) shadows it in PATH and CMake's vs_link_exe
   // wrapper picks up the wrong linker.
