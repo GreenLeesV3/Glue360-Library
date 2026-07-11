@@ -1,0 +1,220 @@
+# Spider-Man: Web of Shadows (Xbox 360) � Game Profile
+#
+# Declarative description of everything game-specific the recompiler needs to
+# produce a playable native Windows port of Spider-Man: Web of Shadows.
+# Consumed by recomp::profile::load_profile() (src/profile/game_profile.cpp).
+
+[profile]
+id = "spiderman_wos"
+name = "Spider-Man: Web of Shadows (Xbox 360)"
+title_id = "41560815"          # Xbox 360 retail title ID
+sdk_version = "0.8.0"          # RexGlue360 SDK version this profile targets
+xex_entrypoint = "default.xex"
+project_name = "spiderman_wos"
+
+# --- Function hints (injected into manifest before codegen) ---
+# 148 virtual dispatch thunks the codegen scanner missed in a ~4KB region
+# (0x82431E80-0x824328B0). Found through crash analysis loop.
+
+[functions]
+"0x82431E80" = {}
+"0x82431EB0" = {}
+"0x82431EC0" = {}
+"0x82431ED0" = {}
+"0x82431EF0" = {}
+"0x82431F00" = {}
+"0x82431F10" = {}
+"0x82431F20" = {}
+"0x82431F30" = {}
+"0x82431F40" = {}
+"0x82431F50" = {}
+"0x82431F60" = {}
+"0x82431F70" = {}
+"0x82431F90" = {}
+"0x82431FA0" = {}
+"0x82431FC0" = {}
+"0x82431FD0" = {}
+"0x82431FF0" = {}
+"0x82432000" = {}
+"0x82432010" = {}
+"0x82432020" = {}
+"0x82432040" = {}
+"0x82432050" = {}
+"0x82432070" = {}
+"0x82432090" = {}
+"0x824320A0" = {}
+"0x824320B0" = {}
+"0x824320C0" = {}
+"0x824320D0" = {}
+"0x824320E0" = {}
+"0x824320F0" = {}
+"0x82432100" = {}
+"0x82432110" = {}
+"0x82432120" = {}
+"0x82432130" = {}
+"0x82432140" = {}
+"0x82432150" = {}
+"0x82432180" = {}
+"0x824321A0" = {}
+"0x824321B0" = {}
+"0x824321C0" = {}
+"0x824321D0" = {}
+"0x824321E0" = {}
+"0x824321F0" = {}
+"0x82432200" = {}
+"0x82432210" = {}
+"0x82432220" = {}
+"0x82432230" = {}
+"0x82432260" = {}
+"0x82432270" = {}
+"0x82432280" = {}
+"0x824322A0" = {}
+"0x824322C0" = {}
+"0x824322D0" = {}
+"0x824322E0" = {}
+"0x824322F0" = {}
+"0x82432300" = {}
+"0x82432310" = {}
+"0x82432320" = {}
+"0x82432330" = {}
+"0x82432340" = {}
+"0x82432350" = {}
+"0x82432360" = {}
+"0x82432370" = {}
+"0x82432380" = {}
+"0x82432390" = {}
+"0x824323A0" = {}
+"0x824323B0" = {}
+"0x824323C0" = {}
+"0x824323D0" = {}
+"0x824323E0" = {}
+"0x824323F0" = {}
+"0x82432400" = {}
+"0x82432410" = {}
+"0x82432430" = {}
+"0x82432450" = {}
+"0x82432460" = {}
+"0x82432470" = {}
+"0x82432480" = {}
+"0x82432490" = {}
+"0x824324A0" = {}
+"0x824324B0" = {}
+"0x824324C0" = {}
+"0x824324D0" = {}
+"0x824324F0" = {}
+"0x82432500" = {}
+"0x82432510" = {}
+"0x82432520" = {}
+"0x82432530" = {}
+"0x82432540" = {}
+"0x82432550" = {}
+"0x82432570" = {}
+"0x82432580" = {}
+"0x82432590" = {}
+"0x824325A0" = {}
+"0x824325B0" = {}
+"0x824325C0" = {}
+"0x824325D0" = {}
+"0x824325E0" = {}
+"0x824325F0" = {}
+"0x82432610" = {}
+"0x82432620" = {}
+"0x82432630" = {}
+"0x82432640" = {}
+"0x82432650" = {}
+"0x82432660" = {}
+"0x82432670" = {}
+"0x82432680" = {}
+"0x82432690" = {}
+"0x824326A0" = {}
+"0x824326B0" = {}
+"0x824326D0" = {}
+"0x824326F0" = {}
+"0x82432700" = {}
+"0x82432710" = {}
+"0x82432720" = {}
+"0x82432730" = {}
+"0x82432740" = {}
+"0x82432750" = {}
+"0x82432770" = {}
+"0x82432780" = {}
+"0x82432790" = {}
+"0x824327A0" = {}
+"0x824327C0" = {}
+"0x824327D0" = {}
+"0x824327E0" = {}
+"0x824327F0" = {}
+"0x82432810" = {}
+"0x82432820" = {}
+"0x82432830" = {}
+"0x82432840" = {}
+"0x82432850" = {}
+"0x82432870" = {}
+"0x82432880" = {}
+"0x82432890" = {}
+"0x824328A0" = {}
+"0x824328B0" = {}
+"0x8299A910" = {}
+"0x829A763C" = {}
+"0x829AD244" = {}
+"0x829B3D4C" = {}
+"0x829B7A78" = {}
+"0x829FE470" = {}
+"0x82A05A28" = {}
+"0x82A4B708" = {}
+"0x82A564B0" = {}
+"0x82A5AA48" = {}
+"0x82A8D8E8" = {}
+
+[build]
+# No runtime patches needed � the prebuilt SDK works as-is.
+requires_sdk_source = false
+
+[[sources]]
+from = "src/main.cpp"
+to   = "src/main.cpp"
+optional = false
+
+[[sources]]
+from = "src/spiderman_wos_app.h"
+to   = "src/spiderman_wos_app.h"
+optional = false
+
+[[sources]]
+from = "src/roundevenf.cpp"
+to   = "src/roundevenf.cpp"
+optional = false
+
+# --- Cvars: rendered into spiderman_wos_app.h::OnPreSetup ---
+# RTV render path with execute_unclipped_draw_vs_on_cpu fix (prevents black screen)
+# Based on Skate3Recomp config patterns � same AMD APU validated.
+[cvars]
+# No render_target_path_d3d12 override � SDK defaults to RTV on AMD
+# GPU optimizations
+gpu_allow_invalid_fetch_constants = "true"
+async_shader_compilation = "true"
+# Skate3-style cvars (critical for RTV black screen fix)
+protect_zero = "false"
+clear_memory_page_state = "false"
+execute_unclipped_draw_vs_on_cpu = "true"
+occlusion_query_enable = "true"
+# Present optimizations
+d3d12_allow_variable_refresh_rate_and_tearing = "true"
+host_present_from_non_ui_thread = "true"
+# 60 FPS unlock
+video_mode_refresh_rate = "120.0"
+vsync = "false"
+# Shader cache
+store_shaders = "true"
+
+[build_options]
+static_msvc_runtime = false
+enable_lto = true
+cpu_target = ""
+
+# --- Deploy configuration ---
+[deploy]
+toml_template = "spiderman_wos.toml.template"
+copy_dlls = ["rexruntime.dll"]
+create_game_junction = true
+create_user_data = true

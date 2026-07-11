@@ -1,0 +1,40 @@
+# Spider-Man: Web of Shadows Recompiled - Runtime Configuration
+#
+# This is a TEMPLATE rendered at deploy time by the recompiler app.
+# {{GAME_DATA_ROOT}} is replaced with the absolute path to the extracted game
+# assets (the directory containing default.xex).
+
+# 60 FPS unlock: present waits 2 vblanks, 120Hz = 60 FPS
+video_mode_refresh_rate = 120.0
+
+# Disable VSync for uncapped frame rate
+vsync = false
+
+# D3D12: Allow variable refresh rate / tearing (FreeSync/G-Sync)
+d3d12_allow_variable_refresh_rate_and_tearing = true
+
+# Present from GPU thread, not UI thread
+host_present_from_non_ui_thread = true
+
+# GPU
+gpu_allow_invalid_fetch_constants = true
+async_shader_compilation = true
+
+# Skate3-style cvars -- critical for RTV render path
+# execute_unclipped_draw_vs_on_cpu prevents RTV black screen by avoiding
+# spurious EDRAM range ownership transfers on unclipped draws
+protect_zero = false
+clear_memory_page_state = false
+execute_unclipped_draw_vs_on_cpu = true
+occlusion_query_enable = true
+
+[Core]
+# Default game data path -- rendered from {{GAME_DATA_ROOT}} at deploy time
+game_data_root = "{{GAME_DATA_ROOT}}"
+
+# User data and cache paths
+user_data_root = "user_data"
+cache_path = "user_data\\cache"
+
+# Shader cache persistence
+store_shaders = true

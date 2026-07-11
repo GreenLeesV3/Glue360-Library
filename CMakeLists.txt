@@ -111,6 +111,8 @@ endif()
 # picks up new files. Core sources are listed explicitly.
 file(GLOB_RECURSE _sibling_srcs
     "${CMAKE_SOURCE_DIR}/src/deps/*.cpp"
+    "${CMAKE_SOURCE_DIR}/src/iso/*.cpp"
+    "${CMAKE_SOURCE_DIR}/src/gui/*.cpp"
     "${CMAKE_SOURCE_DIR}/src/profile/*.cpp"
     "${CMAKE_SOURCE_DIR}/src/stages/*.cpp"
 )
@@ -155,12 +157,14 @@ if(WIN32)
         target_link_options(xbox360-recompiler PRIVATE /SUBSYSTEM:CONSOLE)
     endif()
 endif()
-
 # Link the Windows process/job APIs used by ProcessRunner.
 if(WIN32)
     target_link_libraries(xbox360-recompiler PRIVATE
         advapi32      # CreateProcess, JobObjects
-        user32        # (future UI hooks; harmless when unused)
+        user32        # window management, message loop
+        comdlg32      # file picker dialogs (GetOpenFileNameW)
+        comctl32      # progress bar controls
+        winhttp       # title update downloads
     )
 endif()
 

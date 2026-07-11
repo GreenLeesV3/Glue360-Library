@@ -17,6 +17,7 @@
 #include "core/types.h"
 #include "deps/dependency_checker.h"
 #include "profile/game_profile.h"
+#include "gui/gui_launcher.h"
 
 #include <spdlog/spdlog.h>
 
@@ -70,7 +71,7 @@ void print_help() {
         "                        custom runtime build). Optional; if omitted the\n"
         "                        runtime build stage is skipped (prebuilt DLL).\n"
         "  --profile <name>      Game profile name (default: spiderman3).\n"
-        "                        Available profiles: spiderman3, jurassic_hunted.\n"
+        "                        Available profiles: spiderman3, jurassic_hunted, spiderman_wos.\n"
         "  --backend <d3d12|vulkan>  Graphics backend (default: d3d12). If omitted,\n"
         "                           you will be prompted to choose.\n"
         "  --clean               Wipe state and stage outputs before running.\n"
@@ -399,8 +400,25 @@ int run_pipeline(const Args& a) {
 
 int main(int argc, char** argv) {
     Args a = parse_args(argc, argv);
+    if (a.help) {
+        print_help();
+        return 0;
+    }
 
-    if (a.help || argc <= 1) {
+    // No args — try the GUI launcher, fall back to help
+    if (argc <= 1) {
+#ifdef _WIN32
+        auto gui_result = recomp::gui::ShowLauncherWizard();
+        if (gui_result.ok) {
+            a.iso = gui_result.iso_path;
+            a.output = gui_result.output_dir;
+            a.profile = gui_result.profile_name;
+            if (!gui_result.sdk_path.empty()) {
+                a.sdk = gui_result.sdk_path;
+            }
+            return run_pipeline(a);
+        }
+#endif
         print_help();
         return 0;
     }

@@ -64,3 +64,4 @@ desktop.ini
 *.secret
 .env
 .env.*
+*.zip

@@ -20,6 +20,7 @@
 #include "core/pipeline_context.h"
 #include "core/process_runner.h"
 #include "core/types.h"
+#include "iso/xdvdfs_reader.h"
 
 namespace fs = std::filesystem;
 
@@ -123,16 +124,11 @@ CheckResult IsoExtractorStage::check_prereqs(const PipelineContext& ctx) const {
     result.missing.push_back("Valid Xbox 360 (XGD2) ISO");
     return result;
   }
-
-  // extract-xiso: resolve from toolchain/bundled/PATH. A non-empty resolved
-  // path that doesn't exist is a hard error; an empty path means PATH fallback
-  // (validated at run time).
+  // extract-xiso is optional — the built-in XDVDFS reader is the primary method.
   fs::path xiso = resolve_extract_xiso(ctx);
   if (!xiso.empty() && !fs::exists(xiso)) {
-    result.ok = false;
-    result.missing.push_back("extract-xiso: " + xiso.string());
-    result.message = "extract-xiso not found at the resolved path.";
-    return result;
+    // Don't fail — the built-in reader can handle this
+    result.message = "Note: extract-xiso not found; will use built-in XDVDFS reader.";
   }
 
   if (ctx.output_dir.empty()) {
@@ -167,27 +163,47 @@ StageResult IsoExtractorStage::run(PipelineContext& ctx, ProgressCallback progre
   fs::create_directories(out, ec);
 
   if (is_xgd3(iso)) {
-    progress(0.0f, "WARNING: XGD3 detected — Spider-Man 3 is XGD2. Wrong game?");
+    progress(0.0f, "Note: XGD3 detected — extraction may take longer for larger discs.");
   }
 
+  // Try built-in XDVDFS reader first (no external dependency needed)
+  progress(0.1f, "Extracting ISO (built-in XDVDFS reader)...");
+  std::string iso_error;
+  auto iso_progress = [&progress](uint64_t copied, uint64_t total) {
+    if (total > 0) {
+      float frac = 0.1f + 0.7f * static_cast<float>(copied) / static_cast<float>(total);
+      progress(frac, "");
+    }
+  };
+
+  if (recomp::iso::ExtractIso(iso, out, iso_progress, iso_error)) {
+    // Verify default.xex
+    fs::path xex = out / "default.xex";
+    if (fs::exists(xex, ec)) {
+      ctx.extracted_dir = out;
+      progress(1.0f, "ISO extracted to " + out.string());
+      return StageResult::ok("Extracted ISO to " + out.string());
+    }
+  }
+
+  // Built-in reader failed — fall back to extract-xiso
+  progress(0.1f, "Built-in reader: " + iso_error + ". Trying extract-xiso...");
   fs::path xiso = resolve_extract_xiso(ctx);
-  // extract-xiso's -d flag is unreliable (returns "open error: -d No such file or directory").
-  // Instead, set the working directory to the output folder and let extract-xiso
-  // create its subfolder there naturally.
+  if (xiso.empty()) {
+    return StageResult::fail(
+        "Built-in XDVDFS reader failed (" + iso_error +
+        ") and extract-xiso is not available.");
+  }
+
   std::vector<std::string> args = {"-x", iso.string()};
 
-  progress(0.1f, "Extracting ISO with extract-xiso...");
-
   recomp::ProgressCallback on_line =
-      [&progress](float /*frac*/, const std::string& line) {
+      [&progress](float, const std::string& line) {
         progress(0.5f, line);
       };
 
   auto pr = recomp::ProcessRunner::run(xiso, args, out, {}, on_line);
 
-  // extract-xiso may return exit code 1 with a "-d No such file or directory"
-  // warning but still extract all files successfully. Treat exit 0 or 1 as
-  // success and verify by checking for default.xex.
   if (pr.exit_code != 0 && pr.exit_code != 1) {
     return StageResult::fail(
         "extract-xiso failed (exit " + std::to_string(pr.exit_code) + ").",
@@ -201,7 +217,6 @@ StageResult IsoExtractorStage::run(PipelineContext& ctx, ProgressCallback progre
   // immediate subdirectory.
   fs::path xex = out / "default.xex";
   if (!fs::exists(xex, ec)) {
-    // Search one level deep for the subfolder extract-xiso creates
     for (auto& entry : fs::directory_iterator(out, ec)) {
       if (entry.is_directory()) {
         fs::path sub_xex = entry.path() / "default.xex";
