@@ -183,15 +183,16 @@ CheckResult PatchApplierStage::check_prereqs(const PipelineContext& ctx) const {
     return result;
   }
 
-  if (ctx.profile.requires_sdk_source) {
+  // Runtime patches require SDK source. If it's not available, warn but
+  // continue — the game will work without the patches (e.g. no save system
+  // fixes for SP3) but won't have the custom runtime optimizations.
+  if (!ctx.profile.runtime_patches.empty()) {
     if (ctx.sdk_source_path.empty() || !fs::exists(ctx.sdk_source_path)) {
-      result.ok = false;
-      result.missing.push_back("RexGlue SDK source tree: " +
-                                ctx.sdk_source_path.string());
-      result.message =
-          "Profile requires SDK source for runtime patches, but the SDK "
-          "source tree is not available.";
-      return result;
+      result.warnings.push_back(
+          "SDK source not available — runtime patches (" +
+          std::to_string(ctx.profile.runtime_patches.size()) +
+          ") will be skipped. Game will use prebuilt rexruntime.dll "
+          "without custom fixes (e.g. save system patches).");
     }
   }
 
@@ -286,7 +287,9 @@ StageResult PatchApplierStage::run(PipelineContext& ctx, ProgressCallback progre
 
 
   // ---- Stratum 3: runtime patches (overlay headers -> SDK source tree) ----
-  if (ctx.profile.requires_sdk_source && !ctx.profile.runtime_patches.empty()) {
+  // Skip when SDK source is not available (lite mode — prebuilt runtime).
+  if (!ctx.profile.runtime_patches.empty() &&
+      !ctx.sdk_source_path.empty() && fs::exists(ctx.sdk_source_path)) {
     progress(0.7f, "Applying runtime patch stratum (" +
                        std::to_string(ctx.profile.runtime_patches.size()) +
                        " patches)...");

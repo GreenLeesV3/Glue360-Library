@@ -31,13 +31,16 @@ project_name = "spiderman3"
 "0x829B93B0" = "sub_829B93B0"
 
 [build]
-# The profile declares runtime patches → a custom rexruntime.dll must be built
-# from the SDK source tree (the build_runtime stage runs).
-requires_sdk_source = true
+# Set to false for standalone compatibility. When --sdk-source is provided,
+# the patch_applier will still apply runtime patches (save system fixes, etc).
+# Without SDK source, the game uses the prebuilt rexruntime.dll (no save fixes).
+requires_sdk_source = false
+supports_vulkan = true
 
 [build_options]
-# Static CRT — safe here because requires_sdk_source=true means the SDK is
-# rebuilt from source with /MT consistency (Skate3Recomp pattern).
+# Static CRT — only applied when requires_sdk_source=true (game_builder gates
+# on it). In standalone lite mode (requires_sdk_source=false), the prebuilt
+# SDK uses /MD so static_msvc_runtime is effectively ignored.
 static_msvc_runtime = true
 # LTO for Release builds only (smaller exe, better optimization)
 enable_lto = true

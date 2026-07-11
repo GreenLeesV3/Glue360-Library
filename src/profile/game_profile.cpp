@@ -106,6 +106,7 @@ GameProfile parse_profile(const fs::path& profile_dir,
   if (auto* n = root.get("build"); n && n->is_table()) {
     const toml::table& build = *n->as_table();
     p.requires_sdk_source = opt_bool(build, "requires_sdk_source", false);
+    p.supports_vulkan = opt_bool(build, "supports_vulkan", false);
     p.runtime_flags = opt_string_array(build, "runtime_flags");
   }
 
@@ -121,8 +122,10 @@ GameProfile parse_profile(const fs::path& profile_dir,
     p.runtime_flags = opt_string_array(root, "runtime_flags");
   }
 
-  // If runtime_patches is non-empty, force requires_sdk_source true so the
-  // build_runtime stage runs.
+  // Parse runtime_patches (loaded for profiles that declare SDK source
+  // overlays). The patch_applier stage skips them with a warning when SDK
+  // source is not available, enabling "lite" mode (prebuilt runtime, no
+  // save fixes) without removing the patch declarations from the profile.
   if (auto* n = root.get("runtime_patches"); n && n->is_array()) {
     for (const auto& e : *n->as_array()) {
       if (!e.is_table()) continue;
@@ -136,9 +139,7 @@ GameProfile parse_profile(const fs::path& profile_dir,
       if (rp.id.empty()) fail("[[runtime_patches]] requires an `id`");
       p.runtime_patches.push_back(std::move(rp));
     }
-    if (!p.runtime_patches.empty()) p.requires_sdk_source = true;
   }
-
   // --- [cvars] ---
   if (auto* n = root.get("cvars"); n && n->is_table()) {
     for (const auto& [k, v] : *n->as_table()) {

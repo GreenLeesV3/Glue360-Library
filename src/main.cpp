@@ -206,32 +206,8 @@ int run_pipeline(const Args& a, bool gui_mode = false) {
         return 2;
     }
 
-    // Resolve graphics backend
-    recomp::GraphicsBackend gfx_backend = recomp::GraphicsBackend::D3D12;
-    if (!a.backend.empty()) {
-        if (a.backend == "vulkan" || a.backend == "vk") {
-            gfx_backend = recomp::GraphicsBackend::Vulkan;
-        } else if (a.backend == "d3d12" || a.backend == "dx12") {
-            gfx_backend = recomp::GraphicsBackend::D3D12;
-        } else {
-            std::cerr << "error: --backend must be 'd3d12' or 'vulkan'\n";
-            return 2;
-        }
-    } else if (!a.check_deps && !gui_mode) {
-        // Interactive prompt
-        std::cout << "\nSelect graphics backend:\n"
-                  << "  [1] D3D12  (recommended, best performance on AMD/NVIDIA Windows)\n"
-                  << "  [2] Vulkan (cross-platform, experimental)\n"
-                  << "Enter choice [1]: ";
-        std::string choice;
-        std::getline(std::cin, choice);
-        if (choice == "2" || choice == "vulkan" || choice == "vk") {
-            gfx_backend = recomp::GraphicsBackend::Vulkan;
-            std::cout << "Selected: Vulkan\n\n";
-        } else {
-            std::cout << "Selected: D3D12\n\n";
-        }
-    }
+    // Graphics backend — default D3D12. Vulkan only for profiles that support it.
+    // The actual prompt happens after the profile is loaded (below).
 
     PipelineContext ctx;
     ctx.iso_path        = a.iso;
@@ -239,7 +215,6 @@ int run_pipeline(const Args& a, bool gui_mode = false) {
     ctx.sdk_path        = a.sdk;
     ctx.sdk_source_path = a.sdk_source;
     ctx.profile_name    = a.profile;
-    ctx.graphics_backend = gfx_backend;
     ctx.clean           = a.clean;
     ctx.resume          = a.resume;
 
@@ -293,6 +268,44 @@ int run_pipeline(const Args& a, bool gui_mode = false) {
         return 1;
     }
 
+
+    // --- Resolve graphics backend (after profile load) ---
+    // Only profiles with supports_vulkan=true offer Vulkan. All others
+    // default to D3D12 silently.
+    ctx.graphics_backend = recomp::GraphicsBackend::D3D12;
+    if (ctx.profile.supports_vulkan) {
+        if (!a.backend.empty()) {
+            if (a.backend == "vulkan" || a.backend == "vk") {
+                ctx.graphics_backend = recomp::GraphicsBackend::Vulkan;
+            } else if (a.backend == "d3d12" || a.backend == "dx12") {
+                ctx.graphics_backend = recomp::GraphicsBackend::D3D12;
+            } else {
+                std::cerr << "error: --backend must be 'd3d12' or 'vulkan'\n";
+                return 2;
+            }
+        } else if (!a.check_deps && !gui_mode) {
+            std::cout << "\nSelect graphics backend:\n"
+                      << "  [1] D3D12  (recommended)\n"
+                      << "  [2] Vulkan (experimental)\n"
+                      << "Enter choice [1]: ";
+            std::string choice;
+            std::getline(std::cin, choice);
+            if (choice == "2" || choice == "vulkan" || choice == "vk") {
+                ctx.graphics_backend = recomp::GraphicsBackend::Vulkan;
+                std::cout << "Selected: Vulkan\n\n";
+            } else {
+                std::cout << "Selected: D3D12\n\n";
+            }
+        }
+    } else if (!a.backend.empty() &&
+               (a.backend == "vulkan" || a.backend == "vk")) {
+        std::cerr << "error: --backend vulkan is not supported for profile '"
+                  << ctx.profile_name << "'\n";
+        return 2;
+    }
+    Logger::info("Backend: " + std::string(
+        ctx.graphics_backend == recomp::GraphicsBackend::Vulkan
+            ? "Vulkan" : "D3D12"));
     // --- Capture MSVC build env (vcvarsall x64) into ctx.build_env ---
     // Done lazily here so stages can pass ctx.build_env to ProcessRunner.
     // (If vcvarsall is unavailable, build_env stays empty and MSVC-dependent

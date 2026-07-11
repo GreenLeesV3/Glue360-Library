@@ -240,6 +240,11 @@ from = "src/jurassic_hunted_app.h"
 to   = "src/jurassic_hunted_app.h"
 optional = false
 
+[[sources]]
+from = "src/roundevenf.cpp"
+to   = "src/roundevenf.cpp"
+optional = false
+
 # --- Cvars: rendered into jurassic_hunted_app.h::OnPreSetup via the template ---
 # Only safe cvars that don't interfere with the CloakNT engine's gamma pipeline.
 # Do NOT set gamma_render_target_as_unorm16, snorm16_render_target_full_range,
