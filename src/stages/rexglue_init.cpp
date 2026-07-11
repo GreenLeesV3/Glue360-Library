@@ -70,7 +70,7 @@ CheckResult RexglueInitStage::check_prereqs(const PipelineContext& ctx) const {
 
 StageResult RexglueInitStage::run(PipelineContext& ctx, ProgressCallback progress) {
   const std::string& project_name = ctx.profile_name;
-  fs::path project_root = ctx.output_dir / project_name;
+  fs::path project_root = ctx.recomp_dir() / project_name;
   std::error_code ec;
   if (fs::exists(project_root, ec)) {
     progress(0.05f, "Removing previous project directory...");

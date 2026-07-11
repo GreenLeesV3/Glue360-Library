@@ -284,25 +284,6 @@ StageResult PatchApplierStage::run(PipelineContext& ctx, ProgressCallback progre
     }
   }
 
-  // Disable Vulkan backend for D3D12-only games. The prebuilt SDK's
-  // rex::runtime target exports REX_HAS_VULKAN=1 as a compile definition,
-  // which makes rex_app.cpp reference Vulkan symbols not in the D3D12-only
-  // SDK lib. Inject target_compile_definitions AFTER rexglue_setup_target
-  // to override REX_HAS_VULKAN to 0 on the game target.
-  if (ctx.graphics_backend == GraphicsBackend::D3D12) {
-    std::string cmake_content = read_file(cmakelists);
-    std::string include_line = "include(generated/rexglue.cmake)";
-    auto include_pos = cmake_content.find(include_line);
-    if (include_pos != std::string::npos) {
-      std::string override_cmd =
-          "\n# D3D12-only game: strip REX_HAS_VULKAN from the imported target's\n"
-          "# interface compile definitions — rex_app.cpp uses #if REX_HAS_VULKAN\n"
-          "# to conditionally reference Vulkan symbols not in the D3D12-only lib.\n"
-          "set_property(TARGET rex::runtime PROPERTY INTERFACE_COMPILE_DEFINITIONS \"\")\n";
-      cmake_content.insert(include_pos + include_line.size(), override_cmd);
-      write_file(cmakelists, cmake_content);
-    }
-  }
 
   // ---- Stratum 3: runtime patches (overlay headers -> SDK source tree) ----
   if (ctx.profile.requires_sdk_source && !ctx.profile.runtime_patches.empty()) {

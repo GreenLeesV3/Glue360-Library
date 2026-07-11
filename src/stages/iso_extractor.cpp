@@ -153,7 +153,7 @@ CheckResult IsoExtractorStage::check_prereqs(const PipelineContext& ctx) const {
 
 StageResult IsoExtractorStage::run(PipelineContext& ctx, ProgressCallback progress) {
   fs::path iso = ctx.iso_path;
-  fs::path out = ctx.output_dir / "extracted";
+  fs::path out = ctx.recomp_dir() / "extracted";
 
   std::error_code ec;
   if (fs::exists(out, ec)) {

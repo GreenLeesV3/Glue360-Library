@@ -154,12 +154,9 @@ StageResult DeployerStage::run(PipelineContext& ctx, ProgressCallback progress) 
     }
   }
 
-  // 4. Render the deploy TOML via DepsAndProfile's template renderer
-  // (single {{GAME_DATA_ROOT}} placeholder).
-  progress(0.5f, "Rendering " + ctx.profile_name + ".toml...");
-  std::string game_data_root = ctx.profile.create_game_junction
-                                   ? std::string("game")
-                                   : ctx.extracted_dir.string();
+  // 4. Render the deploy TOML.
+  progress(0.4f, "Rendering " + ctx.profile_name + ".toml...");
+  std::string game_data_root = "game";
   fs::path toml_dst = deploy_new / (ctx.profile_name + ".toml");
   std::unordered_map<std::string, std::string> toml_vars = {
       {"GAME_DATA_ROOT", game_data_root},
@@ -171,26 +168,21 @@ StageResult DeployerStage::run(PipelineContext& ctx, ProgressCallback progress) 
     return StageResult::fail("Failed to render " + toml_dst.string());
   }
 
-  // 5. Create the game/ junction -> extracted ISO files.
-  if (ctx.profile.create_game_junction) {
-    progress(0.7f, "Creating game/ junction -> " + ctx.extracted_dir.string());
-    fs::path game_link = deploy_new / "game";
-    if (!create_junction(game_link, ctx.extracted_dir)) {
-      // Non-fatal: re-render the TOML with the absolute path since the
-      // junction is absent, so the exe can still find game data.
-      progress(0.7f,
-               "WARNING: junction creation failed; game will use the absolute "
-               "path in the TOML.");
-      toml_vars["GAME_DATA_ROOT"] = ctx.extracted_dir.string();
-      recomp::profile::render_template(ctx.profile.toml_template, toml_dst,
-                                       toml_vars);
-    } else {
-      // Verify the junction resolves default.xex.
-      if (!fs::exists(game_link / "default.xex", ec)) {
-        progress(0.7f,
-                 "WARNING: game/default.xex not reachable via junction.");
-      }
-    }
+  // 5. Copy game data directly into standalone/game/ (no junction).
+  // A real copy is portable, survives moves, and doesn't leave broken links.
+  progress(0.5f, "Copying game data to game/...");
+  fs::path game_dst = deploy_new / "game";
+  std::error_code copy_ec;
+  fs::copy(ctx.extracted_dir, game_dst,
+           fs::copy_options::recursive | fs::copy_options::overwrite_existing,
+           copy_ec);
+  if (copy_ec) {
+    return StageResult::fail("Failed to copy game data to " +
+                             game_dst.string() + ": " + copy_ec.message());
+  }
+  // Verify default.xex was copied.
+  if (!fs::exists(game_dst / "default.xex", ec)) {
+    progress(0.8f, "WARNING: game/default.xex not found after copy.");
   }
 
   // 6. Seed user_data/ (empty cache builds on first launch).
