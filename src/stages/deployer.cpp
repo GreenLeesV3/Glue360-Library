@@ -130,9 +130,20 @@ StageResult DeployerStage::run(PipelineContext& ctx, ProgressCallback progress) 
     return StageResult::fail("Failed to copy game exe to " + exe_dst.string());
   }
 
-  // 2. Copy rexruntime.dll (custom over prebuilt).
-  progress(0.2f, "Copying rexruntime.dll...");
-  fs::path runtime_dll = ctx.custom_runtime_dll;
+  // 2. Copy rexruntime.dll — profile custom DLL takes priority.
+  // Profile-level DLL (e.g. SP3's FSR + save fix DLL) overrides both
+  // the build-stage custom DLL and the prebuilt SDK DLL.
+  fs::path runtime_dll;
+  if (!ctx.profile.custom_runtime_dll.empty()) {
+    fs::path profile_dll = ctx.profile.profile_dir / ctx.profile.custom_runtime_dll;
+    if (fs::exists(profile_dll, ec)) {
+      runtime_dll = profile_dll;
+    }
+  }
+  if (runtime_dll.empty() && !ctx.custom_runtime_dll.empty() &&
+      fs::exists(ctx.custom_runtime_dll, ec)) {
+    runtime_dll = ctx.custom_runtime_dll;
+  }
   if (runtime_dll.empty() || !fs::exists(runtime_dll, ec)) {
     runtime_dll = ctx.sdk_path / "bin" / "rexruntime.dll";
   }

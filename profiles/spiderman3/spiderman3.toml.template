@@ -28,10 +28,24 @@ d3d12_allow_variable_refresh_rate_and_tearing = true
 # Guest video mode refresh rate
 # 60 FPS unlock: present waits 2 vblanks, 120Hz = 60 FPS
 video_mode_refresh_rate = 120.0
-# NOTE: FSR upscaling (present_effect="fsr") and resolution scaling
-# require the custom-built rexruntime.dll (from SDK source with FidelityFX).
-# The prebuilt DLL does not include FSR shaders. Use --sdk-source to build
-# the custom runtime with FSR support.
+# Internal render resolution — lower = fewer pixels to render
+video_mode_width = 960
+video_mode_height = 540
+
+# Window/display size
+window_width = 1280
+window_height = 720
+
+# Disable CPU readback of render-to-texture resolve results
+readback_resolve = "none"
+
+# Disable native 2x MSAA — halves fragment shader invocations
+native_2x_msaa = false
+
+# FSR spatial upscaling (EASU+RCAS) — upscales 960x540 to 1280x720
+# Requires the custom rexruntime.dll (shipped with this profile)
+present_effect = "fsr"
+present_fsr_sharpness_reduction = 0.2
 
 [Core]
 # Default game data path — rendered from {{GAME_DATA_ROOT}} at deploy time.

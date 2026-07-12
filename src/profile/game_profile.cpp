@@ -106,6 +106,7 @@ GameProfile parse_profile(const fs::path& profile_dir,
   if (auto* n = root.get("build"); n && n->is_table()) {
     const toml::table& build = *n->as_table();
     p.requires_sdk_source = opt_bool(build, "requires_sdk_source", false);
+    p.custom_runtime_dll = opt_string(build, "custom_runtime_dll", "");
     p.runtime_flags = opt_string_array(build, "runtime_flags");
   }
 

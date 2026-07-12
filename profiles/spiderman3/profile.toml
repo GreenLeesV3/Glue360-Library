@@ -31,10 +31,11 @@ project_name = "spiderman3"
 "0x829B93B0" = "sub_829B93B0"
 
 [build]
-# Set to false for standalone compatibility. When --sdk-source is provided,
-# the patch_applier will still apply runtime patches (save system fixes, etc).
-# Without SDK source, the game uses the prebuilt rexruntime.dll (no save fixes).
+# Ships with a custom-built rexruntime.dll (16.3MB) that includes FSR
+# upscaling + save system fixes (7 runtime patches). This DLL overrides
+# the prebuilt 12.5MB one at deploy time.
 requires_sdk_source = false
+custom_runtime_dll = "bin/rexruntime.dll"
 
 [build_options]
 # Static CRT — only applied when requires_sdk_source=true (game_builder gates
@@ -186,7 +187,7 @@ store_shaders = "true"
 # {{GAME_DATA_ROOT}} -> the extracted game data path at deploy time.
 toml_template = "spiderman3.toml.template"
 # DLLs copied alongside the exe into the portable folder.
-copy_dlls = ["rexruntime.dll", "TracyClient.dll"]
+copy_dlls = ["rexruntime.dll"]
 # Create a `game/` junction to the extracted assets in the deploy folder.
 create_game_junction = true
 # Seed a `user_data/` dir for saves + shader cache.
