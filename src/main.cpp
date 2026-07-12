@@ -302,6 +302,7 @@ int run_pipeline(const Args& a, bool gui_mode = false) {
                           << "this selection. Vulkan requires a separate SDK "
                           << "build with REX_HAS_VULKAN=1.\n\n";
             } else {
+                std::cout << "Selected: D3D12\n\n";
             }
         }
     } else if (!a.backend.empty() &&
