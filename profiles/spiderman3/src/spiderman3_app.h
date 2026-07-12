@@ -32,9 +32,10 @@ class Spiderman3App : public rex::ReXApp {
   }
 
   void OnPreSetup(rex::RuntimeConfig& config) override {
-    // === Render path ===
-    rex::cvar::SetFlagByName("render_target_path_d3d12", "rov");
-
+    // === Render path — RTV (2x faster than ROV on AMD) ===
+    rex::cvar::SetFlagByName("render_target_path_d3d12", "rtv");
+    // Prevent RTV black screen (EDRAM ownership fix, same as WoS)
+    rex::cvar::SetFlagByName("execute_unclipped_draw_vs_on_cpu", "true");
     // === 60 FPS unlock ===
     rex::cvar::SetFlagByName("video_mode_refresh_rate", "120.0");
 

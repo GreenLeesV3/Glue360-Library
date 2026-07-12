@@ -13,8 +13,9 @@
 # extracted path supplied by the user).
 
 [GPU]
-# D3D12 render target path
-render_target_path_d3d12 = "rov"
+# D3D12 render target path — RTV (2x faster than ROV on AMD)
+render_target_path_d3d12 = "rtv"
+execute_unclipped_draw_vs_on_cpu = true
 
 # Async shader compilation
 async_shader_compilation = true

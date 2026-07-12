@@ -149,8 +149,12 @@ required = true
 # All 22 cvars forced in OnPreSetup (spiderman3_app.h lines 36-72). Order
 # matches the source for readability; the renderer sorts by insertion order.
 [cvars]
-# Render path.
-render_target_path_d3d12 = "rov"
+# Render path — RTV (faster on AMD, no per-pixel UAV barriers).
+# execute_unclipped_draw_vs_on_cpu prevents black screen (EDRAM ownership
+# transfer corruption, same fix as WoS). Previously thought RTV broke SP3
+# but that was tested WITHOUT this cvar. RTV gives ~2x FPS over ROV.
+render_target_path_d3d12 = "rtv"
+execute_unclipped_draw_vs_on_cpu = "true"
 # 60 FPS unlock: present waits 2 vblanks, 120Hz = 60 FPS.
 video_mode_refresh_rate = "120.0"
 # City rendering fixes (gamma + HDR + MRT + readback).
