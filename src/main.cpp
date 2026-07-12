@@ -277,6 +277,10 @@ int run_pipeline(const Args& a, bool gui_mode = false) {
         if (!a.backend.empty()) {
             if (a.backend == "vulkan" || a.backend == "vk") {
                 ctx.graphics_backend = recomp::GraphicsBackend::Vulkan;
+                std::cerr << "WARNING: The bundled SDK is D3D12-only. The game "
+                          << "will compile and run with D3D12 regardless of\n"
+                          << "--backend vulkan. Vulkan requires a separate SDK "
+                          << "build with REX_HAS_VULKAN=1.\n\n";
             } else if (a.backend == "d3d12" || a.backend == "dx12") {
                 ctx.graphics_backend = recomp::GraphicsBackend::D3D12;
             } else {
@@ -292,9 +296,12 @@ int run_pipeline(const Args& a, bool gui_mode = false) {
             std::getline(std::cin, choice);
             if (choice == "2" || choice == "vulkan" || choice == "vk") {
                 ctx.graphics_backend = recomp::GraphicsBackend::Vulkan;
-                std::cout << "Selected: Vulkan\n\n";
+                std::cout << "Selected: Vulkan\n";
+                std::cout << "WARNING: The bundled SDK is D3D12-only. The game "
+                          << "will compile and run with D3D12 regardless of\n"
+                          << "this selection. Vulkan requires a separate SDK "
+                          << "build with REX_HAS_VULKAN=1.\n\n";
             } else {
-                std::cout << "Selected: D3D12\n\n";
             }
         }
     } else if (!a.backend.empty() &&
