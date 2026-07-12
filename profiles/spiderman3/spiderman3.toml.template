@@ -28,6 +28,10 @@ d3d12_allow_variable_refresh_rate_and_tearing = true
 # Guest video mode refresh rate
 # 60 FPS unlock: present waits 2 vblanks, 120Hz = 60 FPS
 video_mode_refresh_rate = 120.0
+# NOTE: FSR upscaling (present_effect="fsr") and resolution scaling
+# require the custom-built rexruntime.dll (from SDK source with FidelityFX).
+# The prebuilt DLL does not include FSR shaders. Use --sdk-source to build
+# the custom runtime with FSR support.
 
 [Core]
 # Default game data path — rendered from {{GAME_DATA_ROOT}} at deploy time.

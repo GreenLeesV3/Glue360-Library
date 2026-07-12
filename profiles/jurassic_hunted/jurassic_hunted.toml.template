@@ -49,3 +49,38 @@ cache_path = "user_data\\cache"
 # MNK disabled — game's 61% right-stick dead zone makes mouse aiming impractical.
 # Use a DualSense controller instead.
 mnk_mode = false
+
+mnk_sensitivity = 5.0
+
+# Triggers
+keybind_left_trigger = "RMB"    # Aim down sights
+keybind_right_trigger = "LMB"   # Fire weapon
+
+# Face buttons
+keybind_b = "Control"  # Crouch / Cancel
+keybind_x = "R"         # Reload
+keybind_y = "F"         # Switch weapon / Interact
+
+# Shoulder buttons
+keybind_left_shoulder = "G"    # Grenade
+keybind_right_shoulder = "V"   # Melee
+
+# Left stick (movement) — WASD
+keybind_lstick_up = "W"
+keybind_lstick_down = "S"
+keybind_lstick_left = "A"
+keybind_lstick_right = "D"
+keybind_lstick_press = "Shift"  # Sprint
+
+# Right stick press (mouse)
+keybind_rstick_press = "MMB"   # Mouse middle click
+
+# D-pad
+keybind_dpad_up = "1"
+keybind_dpad_down = "2"
+keybind_dpad_left = "3"
+keybind_dpad_right = "4"
+
+# Menu buttons
+keybind_back = "Tab"      # Objectives / score
+keybind_start = "Escape"  # Pause menu
