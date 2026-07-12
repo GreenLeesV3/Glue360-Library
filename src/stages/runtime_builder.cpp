@@ -141,15 +141,9 @@ StageResult RuntimeBuilderStage::run(PipelineContext& ctx, ProgressCallback prog
     configure_args.push_back("-D" + flag + "=1");
   }
 
-  // Graphics backend selection
-  if (ctx.graphics_backend == recomp::GraphicsBackend::Vulkan) {
-      configure_args.push_back("-DREXGLUE_USE_D3D12=ON");   // D3D12 compiled in for symbol compat but unused at runtime
-      configure_args.push_back("-DREXGLUE_USE_VULKAN=ON");
-      configure_args.push_back("-DCMAKE_INTERPROCEDURAL_OPTIMIZATION=OFF");  // ThinLTO broken with clang-cl + Vulkan
-  } else {
-      configure_args.push_back("-DREXGLUE_USE_D3D12=ON");
-      configure_args.push_back("-DREXGLUE_USE_VULKAN=OFF");
-  }
+  // Graphics backend — D3D12 only (bundled SDK is D3D12-only).
+  configure_args.push_back("-DREXGLUE_USE_D3D12=ON");
+  configure_args.push_back("-DREXGLUE_USE_VULKAN=OFF");
 
   recomp::ProgressCallback on_line = [&progress](float, const std::string& line) {
     progress(0.3f, line);

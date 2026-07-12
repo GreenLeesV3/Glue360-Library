@@ -13,11 +13,8 @@
 # extracted path supplied by the user).
 
 [GPU]
-# D3D12 render target path (used when built with D3D12 backend)
+# D3D12 render target path
 render_target_path_d3d12 = "rov"
-
-# Vulkan render target path (used when built with Vulkan backend)
-render_target_path_vulkan = "fsi"
 
 # Async shader compilation
 async_shader_compilation = true
@@ -27,10 +24,6 @@ vsync = false
 
 # D3D12: Allow variable refresh rate / tearing
 d3d12_allow_variable_refresh_rate_and_tearing = true
-
-# Vulkan: Allow immediate present mode (no vsync)
-vulkan_allow_present_mode_immediate = true
-vulkan_sparse_shared_memory = false
 
 # Guest video mode refresh rate
 # 60 FPS unlock: present waits 2 vblanks, 120Hz = 60 FPS

@@ -106,7 +106,7 @@ std::string PipelineContext::to_json() const {
     root["deploy_dir"]            = path_val(deploy_dir);
     root["toolchain"]             = toolchain_to_json(toolchain);
     root["build_env"]             = env_to_json(build_env);
-    root["graphics_backend"]      = Value(graphics_backend == GraphicsBackend::Vulkan ? "vulkan" : "d3d12");
+    root["graphics_backend"]      = Value("d3d12");
     return json::dump(Value(root));
 }
 
@@ -136,7 +136,7 @@ bool PipelineContext::from_json(const std::string& text) {
     game_build_dir        = get_path(o, "game_build_dir");
     built_exe             = get_path(o, "built_exe");
     std::string be = o.get_string("graphics_backend", "d3d12");
-    graphics_backend = (be == "vulkan") ? GraphicsBackend::Vulkan : GraphicsBackend::D3D12;
+    graphics_backend = GraphicsBackend::D3D12;  // always D3D12
     deploy_dir            = get_path(o, "deploy_dir");
     toolchain_from_json(o.get("toolchain"), toolchain);
     // build_env is NOT restored from state.json — it's volatile (captured

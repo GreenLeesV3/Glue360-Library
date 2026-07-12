@@ -73,8 +73,6 @@ void print_help() {
         "                        runtime build stage is skipped (prebuilt DLL).\n"
         "  --profile <name>      Game profile name (default: spiderman3).\n"
         "                        Available profiles: spiderman3, jurassic_hunted, spiderman_wos.\n"
-        "  --backend <d3d12|vulkan>  Graphics backend (default: d3d12). If omitted,\n"
-        "                           you will be prompted to choose.\n"
         "  --clean               Wipe state and stage outputs before running.\n"
         "  --resume              Resume from the last completed stage (skip\n"
         "                        stages already marked complete in state.json).\n"
@@ -105,7 +103,6 @@ struct Args {
     fs::path sdk;
     fs::path sdk_source;
     std::string profile = "spiderman3";
-    std::string backend;  // "d3d12" or "vulkan", empty = prompt
     bool clean = false;
     bool resume = false;
     bool check_deps = false;
@@ -130,7 +127,6 @@ Args parse_args(int argc, char** argv) {
         else if (arg == "--sdk")                     a.sdk = next("--sdk");
         else if (arg == "--sdk-source")              a.sdk_source = next("--sdk-source");
         else if (arg == "--profile")                 a.profile = next("--profile");
-        else if (arg == "--backend")              a.backend = next("--backend");
         else if (arg == "--clean")                   a.clean = true;
         else if (arg == "--resume")                  a.resume = true;
         else if (arg == "--check-deps")              a.check_deps = true;
@@ -206,8 +202,7 @@ int run_pipeline(const Args& a, bool gui_mode = false) {
         return 2;
     }
 
-    // Graphics backend — default D3D12. Vulkan only for profiles that support it.
-    // The actual prompt happens after the profile is loaded (below).
+    // Graphics backend is D3D12 only (the bundled SDK is D3D12-only).
 
     PipelineContext ctx;
     ctx.iso_path        = a.iso;
@@ -269,51 +264,6 @@ int run_pipeline(const Args& a, bool gui_mode = false) {
     }
 
 
-    // --- Resolve graphics backend (after profile load) ---
-    // Only profiles with supports_vulkan=true offer Vulkan. All others
-    // default to D3D12 silently.
-    ctx.graphics_backend = recomp::GraphicsBackend::D3D12;
-    if (ctx.profile.supports_vulkan) {
-        if (!a.backend.empty()) {
-            if (a.backend == "vulkan" || a.backend == "vk") {
-                ctx.graphics_backend = recomp::GraphicsBackend::Vulkan;
-                std::cerr << "WARNING: The bundled SDK is D3D12-only. The game "
-                          << "will compile and run with D3D12 regardless of\n"
-                          << "--backend vulkan. Vulkan requires a separate SDK "
-                          << "build with REX_HAS_VULKAN=1.\n\n";
-            } else if (a.backend == "d3d12" || a.backend == "dx12") {
-                ctx.graphics_backend = recomp::GraphicsBackend::D3D12;
-            } else {
-                std::cerr << "error: --backend must be 'd3d12' or 'vulkan'\n";
-                return 2;
-            }
-        } else if (!a.check_deps && !gui_mode) {
-            std::cout << "\nSelect graphics backend:\n"
-                      << "  [1] D3D12  (recommended)\n"
-                      << "  [2] Vulkan (experimental)\n"
-                      << "Enter choice [1]: ";
-            std::string choice;
-            std::getline(std::cin, choice);
-            if (choice == "2" || choice == "vulkan" || choice == "vk") {
-                ctx.graphics_backend = recomp::GraphicsBackend::Vulkan;
-                std::cout << "Selected: Vulkan\n";
-                std::cout << "WARNING: The bundled SDK is D3D12-only. The game "
-                          << "will compile and run with D3D12 regardless of\n"
-                          << "this selection. Vulkan requires a separate SDK "
-                          << "build with REX_HAS_VULKAN=1.\n\n";
-            } else {
-                std::cout << "Selected: D3D12\n\n";
-            }
-        }
-    } else if (!a.backend.empty() &&
-               (a.backend == "vulkan" || a.backend == "vk")) {
-        std::cerr << "error: --backend vulkan is not supported for profile '"
-                  << ctx.profile_name << "'\n";
-        return 2;
-    }
-    Logger::info("Backend: " + std::string(
-        ctx.graphics_backend == recomp::GraphicsBackend::Vulkan
-            ? "Vulkan" : "D3D12"));
     // --- Capture MSVC build env (vcvarsall x64) into ctx.build_env ---
     // Done lazily here so stages can pass ctx.build_env to ProcessRunner.
     // (If vcvarsall is unavailable, build_env stays empty and MSVC-dependent

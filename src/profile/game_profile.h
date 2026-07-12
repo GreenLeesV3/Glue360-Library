@@ -66,7 +66,6 @@ struct GameProfile {
 
   // True when the profile declares runtime patches → build_runtime runs.
   bool requires_sdk_source = false;
-  bool supports_vulkan = false;  // true if the game supports Vulkan backend
   // --- Build options (from [build_options] in profile.toml) ---
   struct BuildOptions {
     bool static_msvc_runtime = true;   // static CRT (no VC++ redistributable)

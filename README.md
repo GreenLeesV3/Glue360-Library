@@ -10,7 +10,7 @@ playable standalone folder — no manual `cmake`/`ninja`/`clang-cl` wrangling
 required.
 
 > **v1.1 status:** CLI-first (headless mode). Two game profiles are supported:
-> Spider-Man 3 (D3D12 + Vulkan) and Jurassic: The Hunted (D3D12). The app can
+> Spider-Man 3 (D3D12) and Jurassic: The Hunted (D3D12). The app can
 > be bundled as a fully standalone distribution with the RexGlue SDK, CMake,
 > Ninja, and extract-xiso all bundled — requiring only Visual Studio 2022 on
 > the target machine.
@@ -40,9 +40,6 @@ required.
   before falling back to PATH.
 - **No hardcoded paths** — the app runs from any directory. All outputs live
   under a workspace root you choose (`--output`).
-- **Graphics backend selection** — choose `--backend d3d12` (default,
-  recommended on Windows) or `--backend vulkan` (Vulkan 1.2+, experimental)
-  at recompile time.
 - **Build optimizations** — LTO for Release builds, optional static MSVC
   runtime (when building SDK from source), ccache auto-detection, and AVX
   CPU targeting (`x86-64-v3`) for better PPC SIMD matching.
@@ -67,7 +64,7 @@ required.
 | **Ninja** | 1.11+ | Yes | Bundled at `tools/ninja.exe` in standalone dist. |
 | **RexGlue360 SDK** | 0.8.0 | Yes | Bundled at `sdk/` in standalone dist. |
 | **extract-xiso** | any recent build | Yes | Bundled at `tools/extract-xiso.exe`. |
-| **GPU (runtime)** | D3D12 feature level 11_0+ *or* Vulkan 1.2+ | — | For running the recompiled game. |
+| **GPU (runtime)** | D3D12 feature level 11_0+ | — | For running the recompiled game. |
 
 A complete dependency report is available at any time with:
 
@@ -90,8 +87,7 @@ xbox360-recompiler --check-deps
 xbox360-recompiler.exe ^
     --iso   "D:\Games\Spider-Man 3.iso" ^
     --output "D:\Recomp\Spider-Man 3" ^
-    --profile spiderman3 ^
-    --backend d3d12
+    --profile spiderman3
 ```
 
 ### Option B: Build from source
@@ -112,8 +108,7 @@ build\xbox360-recompiler.exe ^
     --iso   "D:\Games\Spider-Man 3.iso" ^
     --output "D:\Recomp\Spider-Man 3" ^
     --sdk    "C:\Tools\RexGlue360Recomp" ^
-    --profile spiderman3 ^
-    --backend d3d12
+    --profile spiderman3
 ```
 
 When the pipeline finishes you get a portable folder at `--output\standalone\`
@@ -149,8 +144,6 @@ OPTIONS:
                         runtime build stage is skipped (prebuilt DLL).
   --profile <name>      Game profile name (default: spiderman3).
                         Available profiles: spiderman3, jurassic_hunted.
-  --backend <d3d12|vulkan>  Graphics backend (default: d3d12). If omitted,
-                           you will be prompted to choose.
   --clean               Wipe state and stage outputs before running.
   --resume              Resume from the last completed stage (skip
                         stages already marked complete in state.json).
@@ -165,7 +158,7 @@ OPTIONS:
 
 | Game | Profile id | Status | Backend |
 |------|-----------|--------|---------|
-| **Spider-Man 3** (Title ID `415607E2`) | `spiderman3` | Fully supported — save system hooks, cvar patches, custom runtime build, FSR upscaling. | D3D12 + Vulkan |
+| **Spider-Man 3** (Title ID `415607E2`) | `spiderman3` | Fully supported — save system hooks, cvar patches, custom runtime build, FSR upscaling. | D3D12 |
 | **Jurassic: The Hunted** (Title ID `41560870`) | `jurassic_hunted` | Fully supported — 60 FPS unlock, RTV render path, texture cache tuning, 171 function boundary hints. | D3D12 |
 
 The profile system is designed to be **extensible**: a new Xbox 360 title is
@@ -195,14 +188,9 @@ Each profile directory contains:
 
 ## Supported backends
 
-| Backend | `--backend` id | Status | Requirements |
-|---------|---------------|--------|--------------|
-| **Direct3D 12** | `d3d12` | Default, recommended on Windows. | D3D12-compatible GPU (feature level 11_0+). |
-| **Vulkan** | `vulkan` | Experimental. | Vulkan-capable GPU with Vulkan 1.2+ drivers and loader. |
-
-The backend is selected at recompile time and compiled into the custom
-`rexruntime.dll`. Both backends carry the full cvar suite; backend-specific
-cvars for the inactive backend are silently ignored.
+| Backend | Status | Requirements |
+|---------|--------|--------------|
+| **Direct3D 12** | Default, recommended on Windows. | D3D12-compatible GPU (feature level 11_0+). |
 
 ---
 

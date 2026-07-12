@@ -3,8 +3,6 @@ REM ============================================================================
 REM  create_standalone.bat — assemble a fully standalone xbox360-recompiler
 REM  distribution that needs only VS 2022 ("Desktop development with C++")
 REM  The SDK must be the D3D12 build (REX_HAS_D3D12=1, links dxc-headers).
-REM  The Vulkan-build SDK (REX_HAS_VULKAN=1) will NOT work — it causes a
-REM  black screen because rexruntime.lib only contains D3D12 symbols.
 REM
 REM  Layout produced:
 REM    standalone/
@@ -160,13 +158,12 @@ echo Writing README.txt...
     echo.
     echo Available game profiles
     echo -----------------------
-    echo   spiderman3       Spider-Man 3 (D3D12 + Vulkan, FSR, save system)
+    echo   spiderman3       Spider-Man 3 (D3D12, FSR, save system)
     echo   jurassic_hunted  Jurassic: The Hunted (D3D12, 60 FPS unlock)
     echo.
     echo Usage
     echo -----
     echo   xbox360-recompiler.exe --iso ^<game.iso^> --output ^<dir^> --profile ^<name^>
-    echo   xbox360-recompiler.exe --iso ^<game.iso^> --output ^<dir^> --profile ^<name^> --backend vulkan
     echo.
     echo Verify your environment
     echo -----------------------

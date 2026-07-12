@@ -9,7 +9,7 @@ patch, build runtime, build game, deploy.
 SUPPORTED GAMES
 ---------------
   Spider-Man 3 (Title ID 415607E2)       Profile: spiderman3
-    - D3D12 + Vulkan backends
+    - D3D12 backend
     - Save system hooks, cvar patches, FSR upscaling
     - Custom runtime build from SDK source
 
@@ -69,8 +69,7 @@ QUICK START
       --output "path\to\output" ^
       --sdk  "path\to\RexGlue360Recomp" ^
       --sdk-source "path\to\rexglue-sdk-source" ^
-      --profile spiderman3 ^
-      --backend d3d12
+      --profile spiderman3
 
   For Jurassic: The Hunted (prebuilt SDK, no source needed):
   ==========================================================
@@ -78,8 +77,7 @@ QUICK START
       --iso  "path\to\Jurassic.iso" ^
       --output "path\to\output" ^
       --sdk  "path\to\RexGlue360Recomp" ^
-      --profile jurassic_hunted ^
-      --backend d3d12
+      --profile jurassic_hunted
 
 
 OUTPUT
@@ -106,9 +104,6 @@ COMMAND-LINE OPTIONS
   --sdk-source <path>   Path to the RexGlue SDK source tree (for custom
                         runtime build). Optional; if omitted, the prebuilt
                         DLL is used and the runtime build stage is skipped.
-  --backend <id>        Graphics backend:
-                          d3d12  — Direct3D 12 (default, recommended).
-                          vulkan — Vulkan 1.2+ (experimental, SP3 only).
   --profile <name>      Game profile name (default: spiderman3).
                         Available: spiderman3, jurassic_hunted, spiderman_wos.
   --clean               Wipe state and stage outputs before running.
@@ -161,4 +156,4 @@ SYSTEM REQUIREMENTS
   CPU:   x86_64 with SSE4.1+ (AMD64 baseline)
   RAM:   8 GB minimum (16 GB recommended for runtime build)
   Disk:  ~15 GB free (ISO + extraction + build artifacts)
-  GPU:   D3D12-compatible (default), OR Vulkan 1.2+ capable GPU
+  GPU:   D3D12-compatible GPU

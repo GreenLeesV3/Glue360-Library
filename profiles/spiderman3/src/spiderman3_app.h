@@ -33,9 +33,7 @@ class Spiderman3App : public rex::ReXApp {
 
   void OnPreSetup(rex::RuntimeConfig& config) override {
     // === Render path ===
-    // Set both — only the active backend's cvar takes effect
     rex::cvar::SetFlagByName("render_target_path_d3d12", "rov");
-    rex::cvar::SetFlagByName("render_target_path_vulkan", "fsi");
 
     // === 60 FPS unlock ===
     rex::cvar::SetFlagByName("video_mode_refresh_rate", "120.0");
@@ -50,24 +48,16 @@ class Spiderman3App : public rex::ReXApp {
     rex::cvar::SetFlagByName("anisotropic_override", "5");
     rex::cvar::SetFlagByName("swap_post_effect", "fxaa");
 
-    // === Performance optimizations ===
-    // Shared (both backends)
+    // Performance optimizations
     rex::cvar::SetFlagByName("host_present_from_non_ui_thread", "true");
     rex::cvar::SetFlagByName("readback_memexport", "true");
     rex::cvar::SetFlagByName("readback_memexport_fast", "true");
 
-    // D3D12-specific (silently ignored on Vulkan)
+    // D3D12-specific
     rex::cvar::SetFlagByName("d3d12_bindless", "true");
     rex::cvar::SetFlagByName("d3d12_tiled_shared_memory", "true");
     rex::cvar::SetFlagByName("d3d12_submit_on_primary_buffer_end", "false");
     rex::cvar::SetFlagByName("d3d12_pipeline_creation_threads", "2");
-
-    // Vulkan-specific (silently ignored on D3D12)
-    rex::cvar::SetFlagByName("vulkan_allow_present_mode_immediate", "true");
-    rex::cvar::SetFlagByName("vulkan_sparse_shared_memory", "false");
-    rex::cvar::SetFlagByName("vulkan_submit_on_primary_buffer_end", "true");
-    rex::cvar::SetFlagByName("vulkan_pipeline_creation_threads", "2");
-    rex::cvar::SetFlagByName("vulkan_dynamic_rendering", "true");
 
     // Texture cache (shared)
     rex::cvar::SetFlagByName("texture_cache_memory_limit_hard", "4096");

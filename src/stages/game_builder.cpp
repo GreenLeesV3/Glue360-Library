@@ -103,9 +103,7 @@ StageResult GameBuilderStage::run(PipelineContext& ctx, ProgressCallback progres
       "-DCMAKE_C_COMPILER=" + ctx.toolchain.clang_cl_exe.string(),
       "-DCMAKE_CXX_COMPILER=" + ctx.toolchain.clang_cl_exe.string(),
   };
-  // Vulkan disable is handled by patch_applier injecting
-  // set_property(TARGET rex::runtime PROPERTY INTERFACE_COMPILE_DEFINITIONS "")
-  // into the generated CMakeLists.txt for D3D12-only games.
+  // D3D12 only — the bundled SDK sets REX_HAS_D3D12=1 natively.
 
   // Static MSVC runtime — only safe when the SDK is built from source so all
   // targets share the same /MT runtime. The prebuilt SDK was compiled with

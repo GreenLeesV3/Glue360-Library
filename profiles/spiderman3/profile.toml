@@ -35,7 +35,6 @@ project_name = "spiderman3"
 # the patch_applier will still apply runtime patches (save system fixes, etc).
 # Without SDK source, the game uses the prebuilt rexruntime.dll (no save fixes).
 requires_sdk_source = false
-supports_vulkan = true
 
 [build_options]
 # Static CRT — only applied when requires_sdk_source=true (game_builder gates
@@ -136,8 +135,8 @@ category = "game-build"
 required = true
 
 # SpvBuilder.cpp fix — always-on overlay (no flag needed, overlay is copied
-# unconditionally). Fixes glslang 14.3.0 createAccessChain null deref that
-# crashes the Vulkan backend on first shader translation. Harmless on D3D12.
+# unconditionally). Fixes glslang 14.3.0 createAccessChain null deref.
+# Harmless on D3D12.
 [[runtime_patches]]
 id       = "spv_builder"
 flag     = ""
@@ -146,12 +145,11 @@ category = "general-runtime"
 required = true
 
 # --- Cvars: rendered into spiderman3_app.h::OnPreSetup via the template ---
-# All 22 cvars forced in OnPreSetup (spiderman3_app.h lines 36-92). Order
+# All 22 cvars forced in OnPreSetup (spiderman3_app.h lines 36-72). Order
 # matches the source for readability; the renderer sorts by insertion order.
 [cvars]
-# Render path — both set; only the active backend's cvar takes effect.
+# Render path.
 render_target_path_d3d12 = "rov"
-render_target_path_vulkan = "fsi"
 # 60 FPS unlock: present waits 2 vblanks, 120Hz = 60 FPS.
 video_mode_refresh_rate = "120.0"
 # City rendering fixes (gamma + HDR + MRT + readback).
@@ -162,21 +160,15 @@ readback_resolve = "fast"
 # Visual enhancements.
 anisotropic_override = "5"
 swap_post_effect = "fxaa"
-# Performance optimizations — shared (both backends).
+# Performance optimizations.
 host_present_from_non_ui_thread = "true"
 readback_memexport = "true"
 readback_memexport_fast = "true"
-# D3D12-specific (silently ignored on Vulkan).
+# D3D12-specific.
 d3d12_bindless = "true"
 d3d12_tiled_shared_memory = "true"
 d3d12_submit_on_primary_buffer_end = "false"
 d3d12_pipeline_creation_threads = "2"
-# Vulkan-specific (silently ignored on D3D12).
-vulkan_allow_present_mode_immediate = "true"
-vulkan_sparse_shared_memory = "false"
-vulkan_submit_on_primary_buffer_end = "true"
-vulkan_pipeline_creation_threads = "2"
-vulkan_dynamic_rendering = "true"
 # Texture cache (shared).
 texture_cache_memory_limit_hard = "4096"
 texture_cache_memory_limit_soft = "2048"

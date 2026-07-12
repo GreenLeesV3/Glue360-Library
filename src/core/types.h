@@ -56,8 +56,7 @@ enum class LogLevel {
 };
 
 enum class GraphicsBackend {
-    D3D12,
-    Vulkan
+    D3D12
 };
 
 struct ProgressInfo {
