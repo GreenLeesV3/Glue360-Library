@@ -133,11 +133,16 @@ StageResult DeployerStage::run(PipelineContext& ctx, ProgressCallback progress) 
   // 2. Copy rexruntime.dll — profile custom DLL takes priority.
   // Profile-level DLL (e.g. SP3's FSR + save fix DLL) overrides both
   // the build-stage custom DLL and the prebuilt SDK DLL.
+  // When the profile declares a DLL, it is REQUIRED — no silent fallback.
   fs::path runtime_dll;
   if (!ctx.profile.custom_runtime_dll.empty()) {
     fs::path profile_dll = ctx.profile.profile_dir / ctx.profile.custom_runtime_dll;
     if (fs::exists(profile_dll, ec)) {
       runtime_dll = profile_dll;
+    } else {
+      return StageResult::fail(
+          "Profile declares custom_runtime_dll but file does not exist: " +
+          profile_dll.string());
     }
   }
   if (runtime_dll.empty() && !ctx.custom_runtime_dll.empty() &&

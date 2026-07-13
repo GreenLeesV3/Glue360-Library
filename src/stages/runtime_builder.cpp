@@ -1,7 +1,7 @@
 // runtime_builder.cpp — Stage 5 implementation.
 //
 // Builds a custom rexruntime.dll from the (patched) SDK source tree, replacing
-// the prebuilt DLL so the save-system + ROV + queueframes + ThinLTO patches
+// the prebuilt DLL so the save-system + queueframes + ThinLTO patches
 // take effect. SKIPPABLE: if the profile declares no runtime patches, the
 // prebuilt rexruntime.dll from the SDK bin/ is used and this stage is a no-op.
 //
@@ -39,6 +39,26 @@ namespace recomp {
 
 CheckResult RuntimeBuilderStage::check_prereqs(const PipelineContext& ctx) const {
   CheckResult result;
+
+  // Profile-level custom DLL (e.g. SP3's 16.3MB FSR + save fix DLL) takes
+  // precedence over building from source. If the profile declares a DLL,
+  // it MUST exist — this is a requirement, not a hint. A missing profile
+  // DLL is a hard failure (the game would ship without save/FSR fixes).
+  if (!ctx.profile.custom_runtime_dll.empty()) {
+    fs::path profile_dll = ctx.profile.profile_dir / ctx.profile.custom_runtime_dll;
+    std::error_code ec;
+    if (fs::exists(profile_dll, ec)) {
+      result.ok = true;
+      result.message = "Profile ships custom_runtime_dll — stage will skip.";
+      return result;
+    }
+    result.ok = false;
+    result.missing.push_back("Profile custom_runtime_dll: " + profile_dll.string());
+    result.message =
+        "Profile declares custom_runtime_dll but the file does not exist: " +
+        profile_dll.string();
+    return result;
+  }
 
   // Skippable if the profile has no runtime patches (fast path: prebuilt DLL).
   bool needs_runtime_build = !ctx.profile.runtime_flags.empty();
@@ -82,6 +102,21 @@ CheckResult RuntimeBuilderStage::check_prereqs(const PipelineContext& ctx) const
 }
 
 StageResult RuntimeBuilderStage::run(PipelineContext& ctx, ProgressCallback progress) {
+  // Profile-level custom DLL takes precedence over building from source.
+  // If the profile declares a DLL, it MUST exist — fail if missing.
+  if (!ctx.profile.custom_runtime_dll.empty()) {
+    fs::path profile_dll = ctx.profile.profile_dir / ctx.profile.custom_runtime_dll;
+    std::error_code ec;
+    if (fs::exists(profile_dll, ec)) {
+      ctx.custom_runtime_dll = profile_dll;
+      return StageResult::skip(
+          "Using profile-provided custom_runtime_dll: " + profile_dll.string());
+    }
+    return StageResult::fail(
+        "Profile declares custom_runtime_dll but file does not exist: " +
+        profile_dll.string());
+  }
+
   // Fast path: no runtime patches -> skip, use prebuilt DLL.
   if (ctx.profile.runtime_flags.empty()) {
     // The prebuilt rexruntime.dll lives at <sdk_path>/bin/rexruntime.dll.
@@ -210,6 +245,14 @@ StageResult RuntimeBuilderStage::run(PipelineContext& ctx, ProgressCallback prog
 }
 
 bool RuntimeBuilderStage::is_complete(const PipelineContext& ctx) const {
+  // Profile-level custom DLL: complete only if the declared file exists.
+  // A declared-but-missing DLL is NOT complete — the pipeline must not
+  // proceed to deploy without the required custom runtime.
+  if (!ctx.profile.custom_runtime_dll.empty()) {
+    fs::path profile_dll = ctx.profile.profile_dir / ctx.profile.custom_runtime_dll;
+    std::error_code ec;
+    return fs::exists(profile_dll, ec);
+  }
   // Skipped stage is "complete" (prebuilt DLL path recorded).
   if (ctx.profile.runtime_flags.empty()) {
     return !ctx.custom_runtime_dll.empty();

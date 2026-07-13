@@ -4,8 +4,8 @@
 #
 # The D3D12 command processor queues up to kQueueFrames frames of GPU work
 # before blocking the CPU on the oldest fence. The upstream SDK ships
-# kQueueFrames = 3. For Spider-Man 3's feedback-heavy renderer (ROV EDRAM
-# path, frequent readbacks, vsync-locked present), a 3-frame queue adds up
+# kQueueFrames = 3. For Spider-Man 3's feedback-heavy renderer (RTV path,
+# frequent readbacks, vsync-locked present), a 3-frame queue adds up
 # to ~50ms of pipeline latency before a CPU-side state change is observed by
 # the GPU, which tanks FPS minimums (the game stalls waiting for the queue
 # to drain on certain frame transitions).

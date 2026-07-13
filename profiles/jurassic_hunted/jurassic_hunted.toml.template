@@ -5,7 +5,7 @@
 # assets (the directory containing default.xex). All other content mirrors the
 # verified jurassic_hunted.toml shipped with the working build.
 #
-# Source of truth: C:\tmp\Workspace 2\Jurassic the Hunted Recomp\jurassic_hunted\jurassic_hunted.toml
+# Source of truth: GameDevelopment/Jurassic/Source/jurassic_hunted/jurassic_hunted.toml
 # The {{GAME_DATA_ROOT}} placeholder replaces the hardcoded game path so the
 # deployed folder is portable (game_data_root points at the local `game/`
 # junction or an absolute extracted path supplied by the user).

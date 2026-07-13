@@ -1,3 +1,8 @@
+# NOTE (2026-07): Spider-Man 3 switched from ROV to RTV + execute_unclipped_draw_vs_on_cpu.
+# This patch is now DORMANT for SP3 — it only affects the ROV render path, which
+# SP3 no longer uses. Kept for provenance and for other games that may use ROV.
+# The shipped custom DLL (16.3MB) includes this patch but it's a no-op under RTV.
+#
 # EDRAM ROV barrier skip
 #
 # Source: src/graphics/d3d12/render_target_cache.cpp lines 1088-1094

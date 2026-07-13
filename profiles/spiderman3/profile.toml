@@ -52,7 +52,7 @@ cpu_target = ""
 # docs/02_patch_system.md). Applied to the SDK source tree before configure.
 runtime_flags = [
   "REX_GAME_SAVE_SYSTEM_FIX",         # xam_ui + xam_enum + xenumerator (3 files)
-  "REX_ROV_BARRIER_SKIP",             # render_target_cache.cpp EDRAM barrier skip
+  "REX_ROV_BARRIER_SKIP",             # render_target_cache.cpp EDRAM barrier skip (dormant — RTV path doesn't use ROV barriers; kept for custom DLL provenance)
   "REX_QUEUEFRAMES_2",                # command_processor.h kQueueFrames 3->2
   "REX_XAM_DISPATCH_HEADLESS",        # xam_ui.cpp deferred pre/post (part of save fix)
   "REX_XAM_ENUM_IO_PENDING",          # xam_enum.cpp async returns IO_PENDING
@@ -120,6 +120,10 @@ flag     = "REX_ROV_BARRIER_SKIP"
 target   = "src/graphics/d3d12/render_target_cache.cpp"
 category = "general-runtime"
 required = false
+# Dormant with RTV: the ROV barrier skip only applies on the ROV render path.
+# SP3 now uses RTV + execute_unclipped_draw_vs_on_cpu. Kept for custom DLL
+# provenance — the shipped 16.3MB DLL includes this patch but it's a no-op
+# when render_target_path_d3d12 = "rtv".
 
 [[runtime_patches]]
 id       = "command_processor"

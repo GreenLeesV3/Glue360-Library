@@ -5,12 +5,10 @@
 # assets (the directory containing default.xex). All other content mirrors the
 # verified spiderman3.toml shipped with the working build.
 #
-# Source of truth: C:\tmp\Spider-Man 3\spiderman3.toml + the build-output
-# spiderman3.toml at RexGlue360Recomp/spiderman3/out/build/clang-release/.
-# The {{GAME_DATA_ROOT}} placeholder replaces the hardcoded
-# "C:\\tmp\\Workspace 1\\RexGlue360Recomp\\extracted" so the deployed folder is
-# portable (game_data_root points at the local `game/` junction or an absolute
-# extracted path supplied by the user).
+# Source of truth: GameDevelopment/Spider-Man3/ReferenceBuild/spiderman3.toml
+# The {{GAME_DATA_ROOT}} placeholder replaces the hardcoded game path so the
+# deployed folder is portable (game_data_root points at the local `game/`
+# junction or an absolute extracted path supplied by the user).
 
 [GPU]
 # D3D12 render target path — RTV (2x faster than ROV on AMD)
