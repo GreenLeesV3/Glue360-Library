@@ -11,6 +11,7 @@
 #include "core/state_store.h"
 #include "core/types.h"
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <string>
@@ -31,6 +32,10 @@ public:
 
     void set_progress(ProgressFn fn) { progress_ = std::move(fn); }
     void set_logger(LogFn fn) { log_ = std::move(fn); }
+    /// Optional cooperative cancellation — checked between stages. The
+    /// current stage always runs to completion (child processes are not
+    /// killed); the pipeline then halts with a "cancelled" log entry.
+    void set_cancel_flag(const std::atomic<bool>* flag) { cancel_ = flag; }
 
     bool run();
     bool run_one(const std::string& stage_id);
@@ -44,6 +49,7 @@ private:
     std::vector<std::shared_ptr<IStage>> stages_;
     ProgressFn progress_;
     LogFn log_;
+    const std::atomic<bool>* cancel_ = nullptr;
     std::vector<std::string> completed_;
     std::vector<std::string> failed_;
 

@@ -24,8 +24,8 @@
 cmake_minimum_required(VERSION 3.25)
 
 project(xbox360_recompiler
-    VERSION 0.1.0
-    LANGUAGES C CXX)
+    VERSION 1.3.0
+    LANGUAGES C CXX RC)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -125,6 +125,7 @@ add_executable(xbox360-recompiler
     src/core/orchestrator.cpp
     src/core/process_runner.cpp
     src/core/logger.cpp
+    src/gui/app.rc
     ${_sibling_srcs}
 )
 
@@ -132,7 +133,17 @@ target_include_directories(xbox360-recompiler PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
     "${REXGLUE_SDK_ROOT}/include"          # spdlog/, toml++/
     "${CMAKE_SOURCE_DIR}/third_party"      # inja/inja.hpp
+    "${CMAKE_SOURCE_DIR}/third_party/webview2/include"   # WebView2.h
 )
+
+# App version — surfaced to the GUI via the check_deps bridge response.
+target_compile_definitions(xbox360-recompiler PRIVATE
+    RECOMP_APP_VERSION="${PROJECT_VERSION}")
+
+# Recompile the resource whenever the built UI changes (rc.exe does not
+# emit depfiles for RCDATA payloads).
+set_source_files_properties(src/gui/app.rc PROPERTIES
+    OBJECT_DEPENDS "${CMAKE_SOURCE_DIR}/gui/dist/index.html")
 
 # Make find_package(spdlog CONFIG) find the config package at
 # <SDK>/lib/cmake/spdlog (and fmt at <SDK>/lib/cmake/fmt).
@@ -164,7 +175,12 @@ if(WIN32)
         user32        # window management, message loop
         comdlg32      # file picker dialogs (GetOpenFileNameW)
         comctl32      # progress bar controls
-        # winhttp removed — title_update_downloader (the only consumer) was dead code
+        ole32         # COM (WebView2, IFileOpenDialog)
+        shell32       # SHGetKnownFolderPath, ShellExecute
+        shlwapi       # path helpers
+        dwmapi        # dark titlebar
+        version       # WebView2LoaderStatic dependency
+        "${CMAKE_SOURCE_DIR}/third_party/webview2/lib/WebView2LoaderStatic.lib"
     )
 endif()
 

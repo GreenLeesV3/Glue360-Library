@@ -1,0 +1,4 @@
+// gui/app.rc — embeds the built React UI (gui/dist/index.html) as RCDATA.
+// The id must match IDR_GUI_HTML in webview_host.cpp (1001).
+// Build the UI first: cd gui && npm run build
+1001 RCDATA "../../gui/dist/index.html"

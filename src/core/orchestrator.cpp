@@ -99,6 +99,10 @@ bool Orchestrator::run() {
     const float span = stages_.empty() ? 0.0f
         : 1.0f / static_cast<float>(stages_.size());
     for (std::size_t i = 0; i < stages_.size(); ++i) {
+        if (cancel_ && cancel_->load()) {
+            log(LogLevel::Warn, "Pipeline cancelled before stage: " + stages_[i]->id());
+            return false;
+        }
         float base = static_cast<float>(i) * span;
         if (!run_stage_(*stages_[i], base, span)) {
             log(LogLevel::Error, "Pipeline halted at stage: " + stages_[i]->id());

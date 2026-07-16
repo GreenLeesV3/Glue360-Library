@@ -65,3 +65,8 @@ desktop.ini
 .env
 .env.*
 *.zip
+
+# --- Embedded WebView GUI ---
+gui/node_modules/
+!third_party/webview2/lib/
+!third_party/webview2/lib/WebView2LoaderStatic.lib

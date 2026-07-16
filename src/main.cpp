@@ -18,6 +18,7 @@
 #include "deps/dependency_checker.h"
 #include "profile/game_profile.h"
 #include "gui/gui_launcher.h"
+#include "gui/webview_host.h"
 
 #include <spdlog/spdlog.h>
 
@@ -382,9 +383,13 @@ int main(int argc, char** argv) {
         return 0;
     }
 
-    // No args — try the GUI launcher, fall back to help
+    // No args — launch the WebView2 GUI (Glue360 Deck). Falls back to the
+    // legacy Win32 dialog wizard when the WebView2 runtime is unavailable.
     if (argc <= 1) {
 #ifdef _WIN32
+        if (recomp::gui::RunWebViewGui()) {
+            return 0;
+        }
         auto gui_result = recomp::gui::ShowLauncherWizard();
         if (gui_result.ok) {
             a.iso = gui_result.iso_path;

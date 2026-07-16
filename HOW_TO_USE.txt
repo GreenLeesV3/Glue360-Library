@@ -31,13 +31,21 @@ SUPPORTED GAMES
 QUICK START
 -----------
 
-  Using the GUI launcher (double-click):
-  =======================================
-  Just run xbox360-recompiler.exe with no arguments. A file picker wizard
-  will guide you through selecting the ISO, output folder, and game profile.
+  Using the GUI (recommended):
+  ============================
+  Double-click xbox360-recompiler.exe. The GLUE360 library opens by default.
+  Choose Recompiler, select a profile and ISO, then choose a Games Root Folder.
+  GLUE360 creates a named workspace for each title:
 
-  Using the standalone distribution:
-  ==================================
+    <games root>\<Game Name>\.recomp\     — extraction and build intermediates
+    <games root>\<Game Name>\standalone\  — playable package
+
+  Already have a compiled game? Choose Import Compiled Game in the library,
+  then select its working folder and .exe. Imported entries persist and launch
+  directly without requiring a recompilation profile.
+
+  Using the command line:
+  =======================
   xbox360-recompiler.exe ^
       --iso  "path\to\game.iso" ^
       --output "path\to\output-folder" ^
@@ -83,15 +91,23 @@ QUICK START
 OUTPUT
 ------
 
-The pipeline produces a standalone game folder at:
+The CLI pipeline produces a standalone game folder at:
   <output>\standalone\
+
+The GUI treats its selected location as a games root and produces:
+  <games root>\<Game Name>\standalone\
 
 Containing:
   <game>.exe         — the recompiled native game executable
   rexruntime.dll     — runtime (custom-built if --sdk-source provided)
   <game>.toml        — runtime configuration (cvars, refresh rate, etc.)
   game\              — junction to extracted game data
-  user_data\         — saves + shader cache
+  user_data\         — user data, saves, profiles, and runtime cache
+
+Portable runtime locations shown in each library entry:
+  User data / saves  — <exe folder>\user_data\
+  Shader cache       — <exe folder>\user_data\cache\shaders\
+                       (shader files may be under shareable\)
 
 
 COMMAND-LINE OPTIONS

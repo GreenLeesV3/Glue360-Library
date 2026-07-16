@@ -76,12 +76,30 @@ xbox360-recompiler --check-deps
 
 ## Quick start
 
-### Option A: Standalone distribution (recommended)
+### Option A: GLUE360 GUI (recommended)
 
 1. Download the standalone release zip and extract it.
 2. Install Visual Studio 2022 with "Desktop development with C++" and LLVM/clang-cl.
-3. Verify: `xbox360-recompiler.exe --check-deps`
-4. Run a recompilation:
+3. Double-click `xbox360-recompiler.exe`. The WebView2 library is the default interface.
+4. Open **Recompiler**, choose a profile and ISO, then select a **Games Root Folder**.
+
+Each build receives its own named workspace:
+
+```text
+<games root>\<Game Name>\
+├── .recomp\       build intermediates and resumable state
+└── standalone\    playable package
+```
+
+The library displays the portable runtime locations for every compiled game:
+
+- **User data / saves:** `<exe folder>\user_data\`
+- **Shader cache:** `<exe folder>\user_data\cache\shaders\` (files may be under `shareable\`)
+
+Use **Import Compiled Game** to add an existing compiled folder and executable
+without recompiling it. Imported entries persist independently of built-in profiles.
+
+### Option B: Command line
 
 ```bat
 xbox360-recompiler.exe ^
@@ -90,7 +108,7 @@ xbox360-recompiler.exe ^
     --profile spiderman3
 ```
 
-### Option B: Build from source
+### Option C: Build from source
 
 ```bat
 :: 1. Get the source
