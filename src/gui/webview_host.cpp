@@ -179,6 +179,8 @@ struct RunningJob {
 struct RunningGame {
     std::string library_id;
     HANDLE process = nullptr;
+    DWORD process_id = 0;
+    HANDLE watcher_stop = nullptr;
     std::thread watcher;
 };
 
@@ -200,6 +202,37 @@ void PostJsonToUi(HWND hwnd, const std::string& payload) {
                       reinterpret_cast<LPARAM>(heap))) {
         delete heap;  // window gone — drop the event
     }
+}
+
+struct CloseWindowRequest {
+    DWORD process_id;
+    bool posted = false;
+};
+
+BOOL CALLBACK PostCloseToProcessWindow(HWND window, LPARAM param) {
+    auto* request = reinterpret_cast<CloseWindowRequest*>(param);
+    DWORD owner_process_id = 0;
+    GetWindowThreadProcessId(window, &owner_process_id);
+    if (owner_process_id == request->process_id) {
+        request->posted = PostMessageW(window, WM_CLOSE, 0, 0) || request->posted;
+    }
+    return TRUE;
+}
+
+
+void StopGameWatcher(RunningGame& game) {
+    if (game.watcher_stop) SetEvent(game.watcher_stop);
+    if (game.watcher.joinable()) game.watcher.join();
+    if (game.watcher_stop) {
+        CloseHandle(game.watcher_stop);
+        game.watcher_stop = nullptr;
+    }
+}
+bool RequestGracefulGameClose(const RunningGame& game) {
+    if (!game.process || game.process_id == 0) return false;
+    CloseWindowRequest request{game.process_id};
+    EnumWindows(PostCloseToProcessWindow, reinterpret_cast<LPARAM>(&request));
+    return request.posted;
 }
 
 // ---------------------------------------------------------------- handlers
@@ -335,16 +368,13 @@ json::Value HandleLaunchGame(HostState& host, const json::Value& args,
         error = "launch_game requires libraryId, exePath and workingDir.";
         return json::Value();
     }
-    // Reap a previously-exited game: the watcher posts the exit event but the
-    // slot stays occupied until we join + close here.
-    if (host.game && host.game->process) {
-        DWORD code = STILL_ACTIVE;
-        GetExitCodeProcess(host.game->process, &code);
-        if (code != STILL_ACTIVE) {
-            if (host.game->watcher.joinable()) host.game->watcher.join();
-            CloseHandle(host.game->process);
-            host.game.reset();
-        }
+    // Reap a previously-exited game. Its detached watcher owns a separate
+    // synchronization handle, so this control handle can close independently.
+    if (host.game && host.game->process &&
+        WaitForSingleObject(host.game->process, 0) == WAIT_OBJECT_0) {
+        StopGameWatcher(*host.game);
+        CloseHandle(host.game->process);
+        host.game.reset();
     }
     if (host.game && host.game->process) {
         error = "A game is already running.";
@@ -371,32 +401,51 @@ json::Value HandleLaunchGame(HostState& host, const json::Value& args,
     }
     CloseHandle(pi.hThread);
 
-    // Join the previous watcher before replacing the slot.
-    if (host.game && host.game->watcher.joinable()) host.game->watcher.join();
 
     auto game = std::make_unique<RunningGame>();
     game->library_id = library_id;
     game->process = pi.hProcess;
+    game->process_id = pi.dwProcessId;
     HWND hwnd = host.hwnd;
-    HANDLE proc = pi.hProcess;
-    game->watcher = std::thread([hwnd, proc, library_id]() {
-        WaitForSingleObject(proc, INFINITE);
-        PostJsonToUi(hwnd, json::dump(json::Value(json::Object{
-            {"event",     json::Value("game")},
-            {"running",   json::Value(false)},
-            {"libraryId", json::Value(library_id)},
-        })));
-    });
+    HANDLE watch_process = OpenProcess(SYNCHRONIZE, FALSE, pi.dwProcessId);
+    game->watcher_stop = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (watch_process && game->watcher_stop) {
+        HANDLE stop_event = game->watcher_stop;
+        game->watcher = std::thread([hwnd, watch_process, stop_event, library_id]() {
+            // Stop event first: teardown wins if both become signaled, so no
+            // message can target a destroyed or reused HWND.
+            HANDLE waits[] = {stop_event, watch_process};
+            DWORD result = WaitForMultipleObjects(2, waits, FALSE, INFINITE);
+            CloseHandle(watch_process);
+            if (result == WAIT_OBJECT_0 + 1) {
+                PostJsonToUi(hwnd, json::dump(json::Value(json::Object{
+                    {"event",     json::Value("game")},
+                    {"running",   json::Value(false)},
+                    {"libraryId", json::Value(library_id)},
+                })));
+            }
+        });
+    } else {
+        if (watch_process) CloseHandle(watch_process);
+        if (game->watcher_stop) {
+            CloseHandle(game->watcher_stop);
+            game->watcher_stop = nullptr;
+        }
+    }
     host.game = std::move(game);
     return json::Value(true);
 }
 
-json::Value HandleStopGame(HostState& host) {
-    if (host.game && host.game->process) {
-        TerminateProcess(host.game->process, 0);
-        // The watcher thread observes the exit and pushes the game event;
-        // it also owns the final CloseHandle via cleanup below.
+json::Value HandleStopGame(HostState& host, std::string& error) {
+    if (!host.game || !host.game->process) return json::Value(true);
+    if (WaitForSingleObject(host.game->process, 0) == WAIT_OBJECT_0)
+        return json::Value(true);
+
+    if (!RequestGracefulGameClose(*host.game)) {
+        error = "Could not find the game's window. It was left running to protect the shader cache.";
+        return json::Value();
     }
+
     return json::Value(true);
 }
 
@@ -460,7 +509,7 @@ std::string HandleWebMessage(HostState& host, const std::string& msg_json) {
         } else if (cmd == "launch_game") {
             data = HandleLaunchGame(host, args, error);
         } else if (cmd == "stop_game") {
-            data = HandleStopGame(host);
+            data = HandleStopGame(host, error);
         } else {
             error = "unknown command: " + cmd;
         }
@@ -635,13 +684,17 @@ bool RunWebViewGui() {
         host.job->cancel.store(true);
         if (host.job->worker.joinable()) host.job->worker.join();
     }
-    if (host.game) {
-        if (host.game->process) {
-            // leave the game running on GUI exit? No — the deck owns it.
-            TerminateProcess(host.game->process, 0);
+    if (host.game && host.game->process) {
+        if (WaitForSingleObject(host.game->process, 0) != WAIT_OBJECT_0) {
+            RequestGracefulGameClose(*host.game);
+            // Never force-kill: an interrupted .xpso write corrupts the shader
+            // cache. If the game ignores WM_CLOSE, closing our handle leaves
+            // the independent game process running.
+            WaitForSingleObject(host.game->process, 2000);
         }
-        if (host.game->watcher.joinable()) host.game->watcher.join();
-        if (host.game->process) CloseHandle(host.game->process);
+        StopGameWatcher(*host.game);
+        CloseHandle(host.game->process);
+        host.game->process = nullptr;
     }
     if (host.webview) host.webview->remove_WebMessageReceived(host.msg_token);
     host.webview.Reset();

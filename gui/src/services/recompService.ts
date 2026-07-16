@@ -346,9 +346,9 @@ export async function launchGame(
   console.info(`[sim] launchGame(${libraryId}) @ ${exePath}`);
 }
 
-export function stopGame(libraryId: string): void {
+export async function stopGame(libraryId: string): Promise<void> {
   if (bridge) {
-    void call("stop_game", { libraryId });
+    await call("stop_game", { libraryId });
     return;
   }
   console.info(`[sim] stopGame(${libraryId})`);

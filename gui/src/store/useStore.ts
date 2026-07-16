@@ -82,7 +82,7 @@ interface State {
   clearFinishedJobs: () => void;
 
   launchGameById: (id: string) => Promise<void>;
-  stopGameById: (id: string) => void;
+  stopGameById: (id: string) => Promise<void>;
   importCompiledGame: (input: ImportCompiledGameInput) => void;
 
   updateSettings: (patch: Partial<AppSettings>) => void;
@@ -362,13 +362,19 @@ export const useStore = create<State>()(
         }
       },
 
-      stopGameById: (id) => {
+      stopGameById: async (id) => {
         const game = get().games.find((g) => g.id === id);
         if (!game) return;
-        stopGame(game.id);
-        set((s) => ({
-          games: s.games.map((g) => (g.id === id ? { ...g, status: "recompiled" } : g)),
-        }));
+        try {
+          await stopGame(game.id);
+          // The host watcher changes status only after the process exits.
+          // A WM_CLOSE timeout therefore correctly remains "running".
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Could not close the game safely.";
+          set((s) => ({
+            games: s.games.map((g) => (g.id === id ? { ...g, launchError: message } : g)),
+          }));
+        }
       },
 
       updateSettings: (patch) => {
@@ -485,7 +491,7 @@ appEvents.subscribe((e) => {
     useStore.setState((s) => ({
       games: s.games.map((g) =>
         g.id === e.libraryId && g.status === "running"
-          ? { ...g, status: "recompiled" }
+          ? { ...g, status: "recompiled", launchError: null }
           : g,
       ),
     }));

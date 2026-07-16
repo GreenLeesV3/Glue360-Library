@@ -93,7 +93,7 @@ export default function GameDetail() {
               {/* actions */}
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 {isRunning ? (
-                  <PrimaryBtn onClick={() => stopGameById(game.id)} className="!from-red-500">
+                  <PrimaryBtn onClick={() => void stopGameById(game.id)} className="!from-red-500">
                     <Square className="h-4 w-4 fill-current" /> Stop
                   </PrimaryBtn>
                 ) : (

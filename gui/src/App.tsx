@@ -96,7 +96,7 @@ function NowPlayingDock() {
         </span>
       </span>
       <button
-        onClick={() => stopGameById(running.id)}
+        onClick={() => void stopGameById(running.id)}
         className="btn btn-danger h-8 px-3 text-[10px]"
         title="Stop game"
       >
