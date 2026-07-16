@@ -9,11 +9,11 @@ builds a custom runtime and the recompiled game, and deploys a portable,
 playable standalone folder — no manual `cmake`/`ninja`/`clang-cl` wrangling
 required.
 
-> **v1.1 status:** CLI-first (headless mode). Two game profiles are supported:
-> Spider-Man 3 (D3D12) and Jurassic: The Hunted (D3D12). The app can
-> be bundled as a fully standalone distribution with the RexGlue SDK, CMake,
-> Ninja, and extract-xiso all bundled — requiring only Visual Studio 2022 on
-> the target machine.
+> **v1.3.0 status: stable.** The WebView2 game library, guided recompilation
+> workflow, compiled-game importing, portable per-game output layout, launch
+> controls, and graceful shutdown path are working and user-verified. This
+> release is the stable application baseline for continued game-profile and
+> recompilation work.
 
 ---
 
