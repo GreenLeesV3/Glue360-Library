@@ -61,6 +61,54 @@ bool create_junction(const fs::path& link, const fs::path& target) {
   return std::system(cmd.c_str()) == 0;
 }
 
+// Identity stamp for the extracted game data + profile overlay. Covers file
+// count, total bytes, and newest mtime so any change to either tree forces a
+// full re-copy on the next deploy.
+std::string compute_game_stamp(const fs::path& extracted_dir,
+                               const fs::path& overlay_dir) {
+  std::error_code ec;
+  uint64_t file_count = 0;
+  uint64_t total_bytes = 0;
+  fs::file_time_type newest = fs::file_time_type::min();
+  auto accumulate = [&](const fs::path& root) {
+    if (!fs::exists(root, ec)) return;
+    for (fs::recursive_directory_iterator it(root, ec), end;
+         !ec && it != end; it.increment(ec)) {
+      if (!it->is_regular_file(ec)) continue;
+      ++file_count;
+      total_bytes += it->file_size(ec);
+      const auto mtime = it->last_write_time(ec);
+      if (!ec && mtime > newest) newest = mtime;
+      ec.clear();
+    }
+    ec.clear();
+  };
+  accumulate(extracted_dir);
+  accumulate(overlay_dir);
+  std::ostringstream ss;
+  ss << extracted_dir.generic_string() << "|" << file_count << "|"
+     << total_bytes << "|" << newest.time_since_epoch().count();
+  return ss.str();
+}
+
+constexpr const char* kGameStampFile = ".recomp_game_stamp";
+
+bool read_text_file(const fs::path& path, std::string& out) {
+  std::ifstream in(path, std::ios::binary);
+  if (!in) return false;
+  std::ostringstream ss;
+  ss << in.rdbuf();
+  out = ss.str();
+  return true;
+}
+
+bool write_text_file(const fs::path& path, const std::string& text) {
+  std::ofstream out(path, std::ios::binary | std::ios::trunc);
+  if (!out) return false;
+  out << text;
+  return static_cast<bool>(out);
+}
+
 }  // namespace
 
 CheckResult DeployerStage::check_prereqs(const PipelineContext& ctx) const {
@@ -186,21 +234,40 @@ StageResult DeployerStage::run(PipelineContext& ctx, ProgressCallback progress) 
 
   // 5. Copy game data directly into standalone/game/ (no junction).
   // A real copy is portable, survives moves, and doesn't leave broken links.
-  progress(0.5f, "Copying game data to game/...");
+  // Redeploy optimization: when the previous standalone/game carries a stamp
+  // proving the extracted data + overlay are unchanged, rename the old copy
+  // into the new staging dir instead of re-copying gigabytes.
   fs::path game_dst = deploy_new / "game";
+  fs::path game_overlay = ctx.profile.profile_dir / "game_overlay";
+  const std::string game_stamp = compute_game_stamp(ctx.extracted_dir, game_overlay);
   std::error_code copy_ec;
-  fs::copy(ctx.extracted_dir, game_dst,
-           fs::copy_options::recursive | fs::copy_options::overwrite_existing,
-           copy_ec);
-  if (copy_ec) {
-    return StageResult::fail("Failed to copy game data to " +
-                             game_dst.string() + ": " + copy_ec.message());
+  bool game_reused = false;
+  fs::path game_old = deploy_final / "game";
+  std::string old_stamp;
+  if (read_text_file(game_old / kGameStampFile, old_stamp) &&
+      old_stamp == game_stamp) {
+    fs::rename(game_old, game_dst, copy_ec);
+    if (!copy_ec) {
+      game_reused = true;
+      progress(0.5f, "Reusing unchanged game data (no copy needed)...");
+    }
+    copy_ec.clear();
+  }
+  if (!game_reused) {
+    progress(0.5f, "Copying game data to game/...");
+    fs::copy(ctx.extracted_dir, game_dst,
+             fs::copy_options::recursive | fs::copy_options::overwrite_existing,
+             copy_ec);
+    if (copy_ec) {
+      return StageResult::fail("Failed to copy game data to " +
+                               game_dst.string() + ": " + copy_ec.message());
+    }
+    write_text_file(game_dst / kGameStampFile, game_stamp);
   }
 
   // Profiles may replace individual disc files with compatibility-prepared
   // variants. The overlay mirrors the game root and is applied after the ISO
   // copy so it remains portable and deterministic across clean deployments.
-  fs::path game_overlay = ctx.profile.profile_dir / "game_overlay";
   if (fs::exists(game_overlay, ec)) {
     progress(0.75f, "Applying profile game-data overlay...");
     fs::copy(game_overlay, game_dst,
