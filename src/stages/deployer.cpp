@@ -8,8 +8,8 @@
 //     rexruntime.dll             <- custom (from runtime build) over prebuilt
 //     TracyClient.dll            <- from prebuilt SDK bin/ (0.13.1, not rebuilt)
 //     spiderman3.toml            <- rendered from profile deploy template
-//     game/                      <- junction -> extracted ISO files
-//     user_data/                 <- seeded (empty cache builds on first launch)
+//     game/                      <- extracted ISO + profile game_overlay/
+//     user_data/                 <- preserved across redeploys
 //       cache/
 //
 // The TOML is rendered from the profile's deploy template
@@ -196,16 +196,48 @@ StageResult DeployerStage::run(PipelineContext& ctx, ProgressCallback progress) 
     return StageResult::fail("Failed to copy game data to " +
                              game_dst.string() + ": " + copy_ec.message());
   }
+
+  // Profiles may replace individual disc files with compatibility-prepared
+  // variants. The overlay mirrors the game root and is applied after the ISO
+  // copy so it remains portable and deterministic across clean deployments.
+  fs::path game_overlay = ctx.profile.profile_dir / "game_overlay";
+  if (fs::exists(game_overlay, ec)) {
+    progress(0.75f, "Applying profile game-data overlay...");
+    fs::copy(game_overlay, game_dst,
+             fs::copy_options::recursive |
+                 fs::copy_options::overwrite_existing,
+             copy_ec);
+    if (copy_ec) {
+      return StageResult::fail("Failed to apply game-data overlay from " +
+                               game_overlay.string() + ": " +
+                               copy_ec.message());
+    }
+  }
   // Verify default.xex was copied.
   if (!fs::exists(game_dst / "default.xex", ec)) {
     progress(0.8f, "WARNING: game/default.xex not found after copy.");
   }
 
-  // 6. Seed user_data/ (empty cache builds on first launch).
+  // 6. Seed user_data/ and preserve existing saves/cache across redeploys.
   if (ctx.profile.create_user_data) {
-    progress(0.85f, "Creating user_data/...");
-    fs::create_directories(deploy_new / "user_data" / "cache", ec);
-    // Do NOT pre-populate cache/shaders/ — it builds on first launch.
+    progress(0.85f, "Preserving user_data/...");
+    const fs::path user_data_new = deploy_new / "user_data";
+    const fs::path user_data_existing = deploy_final / "user_data";
+    fs::create_directories(user_data_new / "cache", ec);
+    if (ec) {
+      return StageResult::fail("Failed to create user_data/: " + ec.message());
+    }
+    if (fs::exists(user_data_existing, ec)) {
+      fs::copy(user_data_existing, user_data_new,
+               fs::copy_options::recursive |
+                   fs::copy_options::overwrite_existing,
+               copy_ec);
+      if (copy_ec) {
+        return StageResult::fail("Failed to preserve user_data/ from " +
+                                 user_data_existing.string() + ": " +
+                                 copy_ec.message());
+      }
+    }
     // Do NOT create a Content/ subtree (triggers a UTF-8 crash without patches).
   }
 

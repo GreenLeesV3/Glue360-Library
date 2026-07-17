@@ -60,9 +60,8 @@ struct PipelineContext {
     bool clean  = false;
     bool resume = false;
 
-    // JSON serialize/deserialize for state.json. Serializes paths + toolchain
-    // + build_env; does NOT serialize profile (reloaded from disk on resume)
-    // or clean/resume flags.
+    // JSON serialize/deserialize for state.json. Serializes paths + toolchain;
+    // does NOT serialize build_env, profile, or transient flags.
     std::string to_json() const;
     bool from_json(const std::string& text);
 

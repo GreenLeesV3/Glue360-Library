@@ -37,6 +37,15 @@ namespace fs = std::filesystem;
 
 namespace recomp {
 
+namespace {
+
+bool profile_needs_runtime_build(const profile::GameProfile& profile) {
+  return profile.requires_sdk_source || !profile.runtime_flags.empty() ||
+         !profile.runtime_patches.empty();
+}
+
+}  // namespace
+
 CheckResult RuntimeBuilderStage::check_prereqs(const PipelineContext& ctx) const {
   CheckResult result;
 
@@ -60,8 +69,7 @@ CheckResult RuntimeBuilderStage::check_prereqs(const PipelineContext& ctx) const
     return result;
   }
 
-  // Skippable if the profile has no runtime patches (fast path: prebuilt DLL).
-  bool needs_runtime_build = !ctx.profile.runtime_flags.empty();
+  bool needs_runtime_build = profile_needs_runtime_build(ctx.profile);
   if (!needs_runtime_build) {
     result.ok = true;
     result.message = "No runtime patches — stage will skip (use prebuilt DLL).";
@@ -117,8 +125,7 @@ StageResult RuntimeBuilderStage::run(PipelineContext& ctx, ProgressCallback prog
         profile_dll.string());
   }
 
-  // Fast path: no runtime patches -> skip, use prebuilt DLL.
-  if (ctx.profile.runtime_flags.empty()) {
+  if (!profile_needs_runtime_build(ctx.profile)) {
     // The prebuilt rexruntime.dll lives at <sdk_path>/bin/rexruntime.dll.
     std::error_code ec;
     fs::path prebuilt = ctx.sdk_path / "bin" / "rexruntime.dll";
@@ -253,12 +260,17 @@ bool RuntimeBuilderStage::is_complete(const PipelineContext& ctx) const {
     std::error_code ec;
     return fs::exists(profile_dll, ec);
   }
-  // Skipped stage is "complete" (prebuilt DLL path recorded).
-  if (ctx.profile.runtime_flags.empty()) {
+  // A skipped prebuilt-runtime stage is complete once its DLL is recorded.
+  if (!profile_needs_runtime_build(ctx.profile)) {
     return !ctx.custom_runtime_dll.empty();
   }
   // Built stage: custom DLL must exist.
   if (ctx.custom_runtime_dll.empty()) return false;
+  const fs::path prebuilt = ctx.sdk_path / "bin" / "rexruntime.dll";
+  std::error_code equivalent_ec;
+  if (fs::equivalent(ctx.custom_runtime_dll, prebuilt, equivalent_ec)) {
+    return false;
+  }
   std::error_code ec;
   return fs::exists(ctx.custom_runtime_dll, ec);
 }

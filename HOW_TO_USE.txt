@@ -27,6 +27,13 @@ SUPPORTED GAMES
     - 60 FPS unlock, shader cache
     - Uses prebuilt SDK (no source build needed)
 
+  Captain America: Super Soldier (Title ID 53450858)  Profile: captain_america
+    - D3D12 backend
+    - 192 function boundary hints (scanner-missed virtual-dispatch targets,
+      recovered via static vtable scan + gameplay crash reports)
+    - XCTD compression-query runtime patch (requires SDK source build)
+    - Saves and shader cache preserved across redeploys
+
 
 QUICK START
 -----------
@@ -121,7 +128,8 @@ COMMAND-LINE OPTIONS
                         runtime build). Optional; if omitted, the prebuilt
                         DLL is used and the runtime build stage is skipped.
   --profile <name>      Game profile name (default: spiderman3).
-                        Available: spiderman3, jurassic_hunted, spiderman_wos.
+                        Available: spiderman3, jurassic_hunted, spiderman_wos,
+                        captain_america.
   --clean               Wipe state and stage outputs before running.
   --resume              Resume from the last completed stage.
   --check-deps          Run only the dependency checker and print a report.

@@ -384,6 +384,9 @@ StageResult PatchApplierStage::run(PipelineContext& ctx, ProgressCallback progre
         if (!copy_tree(overlay, sdk_src_copy)) {
           return StageResult::fail("Failed to apply runtime overlay: " + rp.id);
         }
+      } else if (rp.required && rp.flag.empty()) {
+        return StageResult::fail(
+            "Required runtime overlay is missing: " + overlay.string());
       }
       // Inline-#ifdef / CMake-flag-only patches have no overlay dir; the flag
       // is still recorded for RuntimeBuilder to pass as -D.

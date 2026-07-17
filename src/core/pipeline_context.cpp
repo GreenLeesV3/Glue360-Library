@@ -69,19 +69,6 @@ void toolchain_from_json(const Value& obj, deps::ToolchainInfo& t) {
     t.blocking_ok          = obj.get_bool("blocking_ok");
 }
 
-Value env_to_json(const std::map<std::string, std::string>& env) {
-    Object o;
-    for (const auto& [k, v] : env) o[k] = Value(v);
-    return Value(o);
-}
-
-void env_from_json(const Value& obj, std::map<std::string, std::string>& env) {
-    env.clear();
-    if (!obj.is_object()) return;
-    for (const auto& [k, v] : obj.as_object()) {
-        if (v.is_string()) env[k] = v.as_string();
-    }
-}
 
 } // namespace
 
@@ -105,7 +92,6 @@ std::string PipelineContext::to_json() const {
     root["built_exe"]             = path_val(built_exe);
     root["deploy_dir"]            = path_val(deploy_dir);
     root["toolchain"]             = toolchain_to_json(toolchain);
-    root["build_env"]             = env_to_json(build_env);
     root["graphics_backend"]      = Value("d3d12");
     return json::dump(Value(root));
 }
@@ -139,9 +125,9 @@ bool PipelineContext::from_json(const std::string& text) {
     graphics_backend = GraphicsBackend::D3D12;  // always D3D12
     deploy_dir            = get_path(o, "deploy_dir");
     toolchain_from_json(o.get("toolchain"), toolchain);
-    // build_env is NOT restored from state.json — it's volatile (captured
-    // fresh from vcvarsall on every run). Restoring a stale/empty env would
-    // cause MSVC-dependent stages to fail on resume.
+    // build_env is intentionally never persisted. It is volatile MSVC state
+    // captured fresh from vcvarsall, and the inherited process environment may
+    // contain credentials that must not be written to state.json.
     return true;
 }
 

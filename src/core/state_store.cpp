@@ -32,10 +32,18 @@ bool StateStore::load(PipelineContext& ctx) {
     }
     if (!root.is_object()) return false;
 
+    // Explicit launch options override saved context. In particular, a user
+    // may add --sdk-source while resuming a run that previously used only the
+    // prebuilt SDK.
+    const fs::path requested_sdk_source = ctx.sdk_source_path;
+
     // Context fields are stored as a nested object under "context".
     const Value& cobj = root.get("context");
     if (cobj.is_object()) {
         ctx.from_json(json::dump(cobj));
+    }
+    if (!requested_sdk_source.empty()) {
+        ctx.sdk_source_path = requested_sdk_source;
     }
 
     // Completed stages list.

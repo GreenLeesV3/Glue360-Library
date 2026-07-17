@@ -1,0 +1,14 @@
+# Captain America: Super Soldier Recompiled — Runtime Configuration
+
+# Compile shaders without blocking the render thread and persist the resulting
+# cache between launches.
+# Required by this title's vertex fetch patterns.
+gpu_allow_invalid_fetch_constants = true
+
+async_shader_compilation = true
+store_shaders = true
+
+[Core]
+game_data_root = "{{GAME_DATA_ROOT}}"
+user_data_root = "user_data"
+cache_path = "user_data\\cache"
