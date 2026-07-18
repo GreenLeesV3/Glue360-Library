@@ -160,6 +160,8 @@ echo Writing README.txt...
     echo -----------------------
     echo   spiderman3       Spider-Man 3 (D3D12, FSR, save system)
     echo   jurassic_hunted  Jurassic: The Hunted (D3D12, 60 FPS unlock)
+    echo   spiderman_wos    Spider-Man: Web of Shadows (D3D12, RTV, 60 FPS)
+    echo   captain_america  Captain America: Super Soldier (D3D12, XCTD patch)
     echo.
     echo Usage
     echo -----
