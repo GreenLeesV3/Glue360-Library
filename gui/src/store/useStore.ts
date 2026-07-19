@@ -20,11 +20,13 @@ import {
   appEvents,
   cancelRecompile,
   checkDeps,
+  deleteGameFiles,
   getHostSettings,
   hasBridge,
   jobEvents,
   launchGame,
   listProfiles,
+  pathExists,
   saveHostSettings,
   startRecompile,
   stopGame,
@@ -84,6 +86,19 @@ interface State {
   launchGameById: (id: string) => Promise<void>;
   stopGameById: (id: string) => Promise<void>;
   importCompiledGame: (input: ImportCompiledGameInput) => void;
+
+  /** Remove a library entry (no file deletion). */
+  removeGame: (id: string) => void;
+  /**
+   * Uninstall tiers: entry removal plus optional file deletion.
+   * - deleteInstall: delete the standalone deploy dir (saves auto-preserved)
+   * - deleteWorkspace: also delete the .recomp workspace (frees GBs)
+   * - deleteSaves: do NOT preserve user_data (explicit, destructive)
+   */
+  uninstallGame: (
+    id: string,
+    opts: { deleteInstall: boolean; deleteWorkspace: boolean; deleteSaves: boolean },
+  ) => Promise<{ ok: boolean; errors: string[]; preservedTo: string[] }>;
 
   updateSettings: (patch: Partial<AppSettings>) => void;
 
@@ -198,6 +213,23 @@ export const useStore = create<State>()(
             set((s) => ({ settings: { ...s.settings, ...host } }));
           }
         }
+
+        // Dead-entry detection: flag games whose exe vanished from disk
+        // (deleted externally, drive moved, …) instead of failing at launch.
+        const withExes = get().games.filter((g) => g.exePath);
+        await Promise.all(
+          withExes.map(async (g) => {
+            const exists = await pathExists(g.exePath as string);
+            if (!exists) {
+              set((s) => ({
+                games: s.games.map((x) =>
+                  x.id === g.id ? { ...x, filesMissing: true } : x,
+                ),
+              }));
+            }
+          }),
+        );
+
         await get().refreshToolchain();
       },
 
@@ -213,6 +245,46 @@ export const useStore = create<State>()(
 
       setView: (view) => set({ view }),
       selectGame: (id) => set({ selectedGameId: id, view: "library" }),
+
+      removeGame: (id) =>
+        set((s) => {
+          const games = s.games.filter((g) => g.id !== id);
+          const selectedGameId =
+            s.selectedGameId === id ? (games[0]?.id ?? "") : s.selectedGameId;
+          return { games, selectedGameId };
+        }),
+
+      uninstallGame: async (id, opts) => {
+        const game = get().games.find((g) => g.id === id);
+        if (!game) return { ok: false, errors: ["Game not found"], preservedTo: [] };
+
+        const paths: string[] = [];
+        if (opts.deleteWorkspace && game.source === "profile") {
+          // Whole workspace (contains .recomp + standalone). Only app-built
+          // games get this tier — an imported game's parent folder is
+          // arbitrary user territory and must never be targeted.
+          const deploy = game.deployDir;
+          if (deploy) paths.push(parentWindowsPath(deploy));
+        } else if (opts.deleteInstall && game.deployDir) {
+          paths.push(game.deployDir);
+        }
+
+        const errors: string[] = [];
+        const preservedTo: string[] = [];
+        if (paths.length > 0) {
+          try {
+            const results = await deleteGameFiles(id, paths, !opts.deleteSaves);
+            for (const r of results) {
+              if (!r.ok) errors.push(`${r.path}: ${r.error ?? "delete failed"}`);
+              if (r.preservedUserDataTo) preservedTo.push(r.preservedUserDataTo);
+            }
+          } catch (e) {
+            errors.push(e instanceof Error ? e.message : String(e));
+          }
+        }
+        if (errors.length === 0) get().removeGame(id);
+        return { ok: errors.length === 0, errors, preservedTo };
+      },
 
       openWizard: (prefillProfileId) =>
         set((s) => {

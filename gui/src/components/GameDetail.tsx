@@ -3,7 +3,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   Play, Square, Cpu, Disc3, CheckCircle2, XCircle, FolderOpen, Clock3,
   Activity, Layers, Wrench, Hash, Package, Save, Sparkles, FileCode2,
+  Trash2, AlertTriangle,
 } from "lucide-react";
+import { useState } from "react";
 import { useStore } from "../store/useStore";
 import { openFolder } from "../services/recompService";
 import { fmtDuration, timeAgo } from "../lib/format";
@@ -18,6 +20,18 @@ export default function GameDetail() {
   const launchGameById = useStore((s) => s.launchGameById);
   const stopGameById = useStore((s) => s.stopGameById);
   const openWizard = useStore((s) => s.openWizard);
+  const removeGame = useStore((s) => s.removeGame);
+  const uninstallGame = useStore((s) => s.uninstallGame);
+
+  const [uninstallOpen, setUninstallOpen] = useState(false);
+  const [delInstall, setDelInstall] = useState(true);
+  const [delWorkspace, setDelWorkspace] = useState(false);
+  const [delSaves, setDelSaves] = useState(false);
+  const [uninstallBusy, setUninstallBusy] = useState(false);
+  const [uninstallResult, setUninstallResult] = useState<{
+    errors: string[];
+    preservedTo: string[];
+  } | null>(null);
 
   if (!game) {
     return (
@@ -120,7 +134,106 @@ export default function GameDetail() {
                     <FolderOpen className="h-4 w-4" />
                   </GhostBtn>
                 )}
+                <GhostBtn
+                  onClick={() => { setUninstallOpen((v) => !v); setUninstallResult(null); }}
+                  className="!px-3.5 !border-red-500/30 !text-red-300 hover:!bg-red-500/10"
+                  title="Uninstall / remove from library"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </GhostBtn>
               </div>
+
+              {game.filesMissing && (
+                <div className="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-amber-400/25 bg-amber-400/8 px-3 py-2 text-[11px] text-amber-200">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  <span>Game files not found on disk (moved or deleted externally).</span>
+                  <button
+                    className="font-semibold text-amber-100 underline underline-offset-2 hover:text-white"
+                    onClick={() => removeGame(game.id)}
+                  >
+                    Remove from library
+                  </button>
+                </div>
+              )}
+
+              {uninstallOpen && (
+                <div className="mt-3 rounded-xl border border-red-500/25 bg-red-500/5 p-4">
+                  <p className="font-display text-[11px] font-bold tracking-[0.18em] text-red-300 uppercase">
+                    Uninstall {game.title}
+                  </p>
+                  <div className="mt-3 flex flex-col gap-2 text-[12px] text-white/75">
+                    <label className="flex items-start gap-2.5">
+                      <input type="checkbox" className="mt-0.5" checked={delInstall}
+                        onChange={(e) => setDelInstall(e.target.checked)} disabled={!game.deployDir} />
+                      <span>
+                        Delete installed game files
+                        <span className="block text-[11px] text-white/40">
+                          Removes the standalone build. Saves & shader cache are preserved automatically.
+                        </span>
+                      </span>
+                    </label>
+                    {game.source === "profile" && game.deployDir && (
+                      <label className="flex items-start gap-2.5">
+                        <input type="checkbox" className="mt-0.5" checked={delWorkspace}
+                          onChange={(e) => setDelWorkspace(e.target.checked)} />
+                        <span>
+                          Also delete the recomp workspace
+                          <span className="block text-[11px] text-white/40">
+                            Removes .recomp (extracted ISO, build intermediates) — frees the most disk.
+                          </span>
+                        </span>
+                      </label>
+                    )}
+                    <label className="flex items-start gap-2.5">
+                      <input type="checkbox" className="mt-0.5" checked={delSaves}
+                        onChange={(e) => setDelSaves(e.target.checked)} />
+                      <span className="text-red-200">
+                        Also delete saved games & shader cache
+                        <span className="block text-[11px] text-red-300/50">
+                          Cannot be undone. Leave unchecked to keep your saves.
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                  {uninstallResult && (
+                    <div className="mt-3 space-y-1 text-[11px]">
+                      {uninstallResult.errors.map((e) => (
+                        <p key={e} className="text-red-300">{e}</p>
+                      ))}
+                      {uninstallResult.preservedTo.map((p) => (
+                        <p key={p} className="text-emerald-300">Saves preserved at: {p}</p>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-4 flex items-center gap-3">
+                    <GhostBtn onClick={() => { setUninstallOpen(false); setUninstallResult(null); }}>
+                      Cancel
+                    </GhostBtn>
+                    <PrimaryBtn
+                      className="!from-red-600 !to-red-500"
+                      disabled={uninstallBusy}
+                      onClick={async () => {
+                        setUninstallBusy(true);
+                        setUninstallResult(null);
+                        const r = await uninstallGame(game.id, {
+                          deleteInstall: delInstall,
+                          deleteWorkspace: delWorkspace,
+                          deleteSaves: delSaves,
+                        });
+                        setUninstallBusy(false);
+                        if (r.ok) {
+                          setUninstallOpen(false);
+                        } else {
+                          setUninstallResult({ errors: r.errors, preservedTo: r.preservedTo });
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {uninstallBusy ? "Uninstalling…" : "Uninstall"}
+                    </PrimaryBtn>
+                  </div>
+                </div>
+              )}
               {game.launchError && (
                 <p className="mt-2 rounded-lg border border-red-400/20 bg-red-400/8 px-3 py-2 text-[11px] text-red-300">
                   Launch failed: {game.launchError}

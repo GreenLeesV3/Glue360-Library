@@ -354,6 +354,44 @@ export async function stopGame(libraryId: string): Promise<void> {
   console.info(`[sim] stopGame(${libraryId})`);
 }
 
+/** True when a filesystem path exists (host-checked; false in dev sim). */
+export async function pathExists(path: string): Promise<boolean> {
+  if (bridge) {
+    return (await call("path_exists", { path })) === true;
+  }
+  return true;
+}
+
+export interface DeleteFilesResult {
+  path: string;
+  ok: boolean;
+  missing?: boolean;
+  error?: string;
+  preservedUserDataTo?: string;
+}
+
+/**
+ * Delete game files via the host (JS cannot remove trees). The host refuses
+ * anything that isn't a recognized Glue360 workspace/deploy dir and refuses
+ * outright while the game is running. Saves/shader cache are preserved by
+ * default (moved beside the deleted tree) unless preserveUserData is false.
+ */
+export async function deleteGameFiles(
+  libraryId: string,
+  paths: string[],
+  preserveUserData = true,
+): Promise<DeleteFilesResult[]> {
+  if (bridge) {
+    return (await call("delete_game_files", {
+      libraryId,
+      paths,
+      preserveUserData,
+    })) as DeleteFilesResult[];
+  }
+  console.info(`[sim] deleteGameFiles(${libraryId}):`, paths);
+  return paths.map((path) => ({ path, ok: true }));
+}
+
 /* ============================================================================
    SIMULATION — dev-mode only (`npm run dev` in a browser, no C++ host).
    Log lines mirror the real pipeline's phrasing so the demo looks honest.

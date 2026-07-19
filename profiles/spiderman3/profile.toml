@@ -35,7 +35,11 @@ project_name = "spiderman3"
 # upscaling + save system fixes (7 runtime patches). This DLL overrides
 # the prebuilt 12.5MB one at deploy time.
 requires_sdk_source = false
-custom_runtime_dll = "bin/rexruntime.dll"
+# custom_runtime_dll removed 2026-07-17: the bundled pre-port DLL paired
+# with a new exe caused a RuntimeConfig ABI mismatch. The runtime now builds
+# from sdk-source (presenter-port) with this profile's runtime_patches.
+# Old DLL kept beside it as bin/rexruntime.dll.pre-port.bak.
+# custom_runtime_dll = "bin/rexruntime.dll"
 
 [build_options]
 # Static CRT — only applied when requires_sdk_source=true (game_builder gates

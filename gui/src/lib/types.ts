@@ -40,6 +40,8 @@ export interface Game {
   userDataDir: string | null; // portable runtime root: saves, profiles and cache
   shaderCacheDir: string | null; // <exe dir>\user_data\cache\shaders
   launchError: string | null;
+  /** exe path missing on disk at boot (files deleted externally, moved, …) */
+  filesMissing?: boolean;
   titleId: string; // Xbox 360 title ID, e.g. 415607E2
   addedAt: number;
 }

@@ -449,6 +449,114 @@ json::Value HandleStopGame(HostState& host, std::string& error) {
     return json::Value(true);
 }
 
+// ---------------------------------------------------------------- uninstall
+
+// Marker dirs that prove a path is a Glue360 workspace/deploy and not an
+// arbitrary user folder. Deletion is refused without one.
+bool HasRecompMarker(const fs::path& p) {
+    std::error_code ec;
+    return fs::exists(p / ".recomp", ec) || fs::exists(p / "standalone", ec) ||
+           p.filename() == "standalone" || p.filename() == ".recomp";
+}
+
+bool IsSafeDeleteTarget(const fs::path& p) {
+    if (p.empty() || !p.is_absolute()) return false;
+    if (p == p.root_path()) return false;  // drive root
+    const std::string norm = p.lexically_normal().generic_string();
+    if (norm.find("..") != std::string::npos) return false;
+    // Require at least two components below the root (never C:\Games itself).
+    if (std::distance(p.begin(), p.end()) < 3) return false;
+    return HasRecompMarker(p);
+}
+
+// Move user_data (saves, profiles, shader cache) out of a tree about to be
+// deleted. Covers the live location, a tier-2-preserved copy, and any prior
+// "*_user_data" preservation folders so saves survive any operation sequence.
+// Returns the preservation destination, or empty if nothing existed.
+fs::path PreserveUserData(const fs::path& target) {
+    std::error_code ec;
+    std::vector<fs::path> candidates{target / "user_data",
+                                     target / "standalone" / "user_data"};
+    // Prior preservation outputs anywhere inside the tree (e.g. a tier-2
+    // "standalone_user_data" folder now threatened by a tier-3 workspace wipe).
+    for (const auto& entry : fs::directory_iterator(target, ec)) {
+        if (!entry.is_directory(ec)) continue;
+        const std::string name = entry.path().filename().string();
+        if (name.size() >= 9 && name.find("user_data") != std::string::npos &&
+            entry.path() != target / "user_data") {
+            candidates.push_back(entry.path());
+        }
+    }
+    fs::path last_preserved;
+    for (const fs::path& candidate : candidates) {
+        if (!fs::exists(candidate, ec)) continue;
+        fs::path dest = target.parent_path() / (target.filename().string() + "_user_data");
+        for (int n = 2; fs::exists(dest, ec) && n < 100; ++n) {
+            dest = target.parent_path() /
+                   (target.filename().string() + "_user_data_" + std::to_string(n));
+        }
+        if (fs::exists(dest, ec)) continue;  // no free slot — leave in place
+        fs::rename(candidate, dest, ec);
+        if (!ec) last_preserved = dest;
+    }
+    return last_preserved;
+}
+
+json::Value HandleDeleteGameFiles(HostState& host, const json::Value& args,
+                                  std::string& error) {
+    const std::string library_id = args.get_string("libraryId");
+    const bool preserve_user_data = args.get_bool("preserveUserData", true);
+
+    // Never delete files out from under a running game — the locked exe would
+    // fail the delete midway and leave a half-removed tree.
+    if (host.game && host.game->process &&
+        WaitForSingleObject(host.game->process, 0) == WAIT_TIMEOUT) {
+        if (library_id.empty() || host.game->library_id == library_id) {
+            error = "The game is currently running. Stop it before uninstalling.";
+            return json::Value();
+        }
+    }
+
+    json::Array results;
+    const json::Value& paths_arg = args.get("paths");
+    if (!paths_arg.is_array()) {
+        error = "delete_game_files: 'paths' must be an array";
+        return json::Value();
+    }
+    for (const auto& pv : paths_arg.as_array()) {
+        const fs::path target = fs::path(pv.as_string());
+        json::Object r{{"path", json::Value(target.string())}};
+        if (!IsSafeDeleteTarget(target)) {
+            r["ok"] = json::Value(false);
+            r["error"] = json::Value(
+                "refused: path is not a recognized Glue360 workspace/deploy directory");
+            results.push_back(json::Value(std::move(r)));
+            continue;
+        }
+        std::error_code ec;
+        if (!fs::exists(target, ec)) {
+            r["ok"] = json::Value(true);  // already gone externally
+            r["missing"] = json::Value(true);
+            results.push_back(json::Value(std::move(r)));
+            continue;
+        }
+        fs::path preserved;
+        if (preserve_user_data) preserved = PreserveUserData(target);
+        fs::remove_all(target, ec);
+        r["ok"] = json::Value(!ec);
+        if (ec) r["error"] = json::Value(ec.message());
+        if (!preserved.empty())
+            r["preservedUserDataTo"] = json::Value(preserved.string());
+        results.push_back(json::Value(std::move(r)));
+    }
+    return json::Value(std::move(results));
+}
+
+json::Value HandlePathExists(const json::Value& args) {
+    std::error_code ec;
+    return json::Value(fs::exists(fs::path(args.get_string("path")), ec));
+}
+
 // Router: parse {rpc, cmd, args}, produce {rpc, ok, data|error}.
 std::string HandleWebMessage(HostState& host, const std::string& msg_json) {
     long long rpc = 0;
@@ -510,6 +618,10 @@ std::string HandleWebMessage(HostState& host, const std::string& msg_json) {
             data = HandleLaunchGame(host, args, error);
         } else if (cmd == "stop_game") {
             data = HandleStopGame(host, error);
+        } else if (cmd == "path_exists") {
+            data = HandlePathExists(args);
+        } else if (cmd == "delete_game_files") {
+            data = HandleDeleteGameFiles(host, args, error);
         } else {
             error = "unknown command: " + cmd;
         }
