@@ -200,7 +200,10 @@ execute_unclipped_draw_vs_on_cpu = "true"
 occlusion_query_enable = "true"
 # Present optimizations
 d3d12_allow_variable_refresh_rate_and_tearing = "true"
-host_present_from_non_ui_thread = "true"
+# Disabled 2026-07-18: the ported non-UI present thread crashes this game
+# (0xC0000005 ~7s after boot; vsync/VRR ruled out). Re-enable after the
+# presenter thread lifetime/sync is validated against the guest boot path.
+host_present_from_non_ui_thread = "false"
 # 60 FPS unlock
 video_mode_refresh_rate = "120.0"
 vsync = "false"

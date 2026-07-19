@@ -174,7 +174,10 @@ readback_resolve = "fast"
 anisotropic_override = "5"
 swap_post_effect = "fxaa"
 # Performance optimizations.
-host_present_from_non_ui_thread = "true"
+# Disabled 2026-07-18: the ported non-UI present thread crashes this game
+# (0xC0000005 ~7s after boot; vsync/VRR ruled out). Re-enable after the
+# presenter thread lifetime/sync is validated against the guest boot path.
+host_present_from_non_ui_thread = "false"
 readback_memexport = "true"
 readback_memexport_fast = "true"
 # D3D12-specific.
