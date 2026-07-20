@@ -8,7 +8,6 @@ gpu_allow_invalid_fetch_constants = true
 async_shader_compilation = true
 store_shaders = true
 
-[Core]
 game_data_root = "{{GAME_DATA_ROOT}}"
 user_data_root = "user_data"
 cache_path = "user_data\\cache"

@@ -28,7 +28,6 @@ clear_memory_page_state = false
 execute_unclipped_draw_vs_on_cpu = true
 occlusion_query_enable = true
 
-[Core]
 # Default game data path -- rendered from {{GAME_DATA_ROOT}} at deploy time
 game_data_root = "{{GAME_DATA_ROOT}}"
 

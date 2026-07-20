@@ -10,7 +10,6 @@
 # deployed folder is portable (game_data_root points at the local `game/`
 # junction or an absolute extracted path supplied by the user).
 
-[GPU]
 # D3D12 render target path — RTV (2x faster than ROV on AMD)
 render_target_path_d3d12 = "rtv"
 execute_unclipped_draw_vs_on_cpu = true
@@ -46,7 +45,6 @@ native_2x_msaa = false
 present_effect = "fsr"
 present_fsr_sharpness_reduction = 0.2
 
-[Core]
 # Default game data path — rendered from {{GAME_DATA_ROOT}} at deploy time.
 # Allows launching the exe without command-line args.
 game_data_root = "{{GAME_DATA_ROOT}}"
