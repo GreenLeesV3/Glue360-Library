@@ -256,6 +256,8 @@ json::Value HandleListProfiles() {
                 {"sdkVersion",    json::Value(p.sdk_version)},
                 {"runtimeFlags",  json::Value(std::move(flags))},
                 {"customRuntime", json::Value(!p.custom_runtime_dll.empty())},
+                {"requiresSdkSource",
+                 json::Value(p.requires_sdk_source || !p.runtime_patches.empty())},
                 {"cvarCount",     json::Value((long long)p.cvars.size())},
             }));
         } catch (...) {

@@ -56,6 +56,10 @@ export interface GameProfile {
   runtimeFlags: string[];
   /** [build] custom_runtime_dll present → ships a custom rexruntime.dll */
   customRuntime: boolean;
+  /** [build] requires_sdk_source or runtime_patches present → needs an SDK
+   *  source tree for the custom runtime build (e.g. Captain America's XCTD
+   *  compression patch). */
+  requiresSdkSource: boolean;
   /** number of [cvars] entries forced by the profile */
   cvarCount: number;
 }

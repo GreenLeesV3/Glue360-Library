@@ -334,8 +334,11 @@ function StepOutput() {
   const setDraft = useStore((s) => s.setDraft);
   const setDraftOutputRoot = useStore((s) => s.setDraftOutputRoot);
   const settings = useStore((s) => s.settings);
-  const updateSettings = useStore((s) => s.updateSettings);
+  const profiles = useStore((s) => s.profiles);
   const [advanced, setAdvanced] = useState(false);
+
+  const selectedProfile = profiles.find((p) => p.id === draft.profileId);
+  const needsSdkSource = selectedProfile?.requiresSdkSource === true;
 
   const browseOutput = async () => {
     const dir = await pickDir("Select the folder that will contain your game folders");
@@ -343,7 +346,7 @@ function StepOutput() {
   };
   const browseSdkSource = async () => {
     const dir = await pickDir("Select RexGlue SDK source tree");
-    if (dir) updateSettings({ sdkSourcePath: dir });
+    if (dir) setDraft({ sdkSourcePath: dir });
   };
 
   return (
@@ -403,13 +406,20 @@ function StepOutput() {
             />
             <div>
               <label className="mb-1.5 block text-[10px] font-bold tracking-[0.18em] text-white/40 uppercase">
-                SDK Source Tree (optional)
+                Alternate SDK Source Tree (this recompile only)
               </label>
+              {needsSdkSource && (
+                <div className="mb-2 flex items-center gap-2 rounded-lg border border-amber-400/25 bg-amber-400/8 px-3 py-2 text-[11px] text-amber-200">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  {selectedProfile?.name} needs a custom runtime build (runtime patches) — point this at
+                  the SDK source tree, or the game will not work correctly.
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <input
-                  value={settings.sdkSourcePath}
-                  onChange={(e) => updateSettings({ sdkSourcePath: e.target.value })}
-                  placeholder="Only needed to rebuild the runtime DLL from source"
+                  value={draft.sdkSourcePath}
+                  onChange={(e) => setDraft({ sdkSourcePath: e.target.value })}
+                  placeholder={settings.sdkSourcePath || "Bundled SDK (default) — pick a source tree only for runtime patches"}
                   className="field font-mono2 !py-2 !text-[11.5px]"
                   spellCheck={false}
                 />
@@ -420,8 +430,9 @@ function StepOutput() {
                 )}
               </div>
               <p className="mt-1.5 text-[10.5px] leading-relaxed text-white/30">
-                Without it, runtime patches are skipped and the profile's bundled runtime DLL is
-                used — that is the normal, supported path.
+                Leave empty to use the app's bundled SDK — the normal, supported path. Set a source
+                tree only when a profile needs a custom runtime build (e.g. Captain America's XCTD
+                patch). Your global default lives in Settings.
               </p>
             </div>
           </div>

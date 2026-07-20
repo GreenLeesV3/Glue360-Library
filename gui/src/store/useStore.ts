@@ -41,6 +41,9 @@ export interface WizardDraft {
   outputRoot: string;
   outputDir: string;
   clean: boolean;
+  /** Per-recompile alternate SDK source tree. Empty = use the app's bundled
+   *  SDK / the global default from settings. */
+  sdkSourcePath: string;
 }
 
 interface WizardState {
@@ -125,6 +128,7 @@ const INITIAL_DRAFT: WizardDraft = {
   outputRoot: "",
   outputDir: "",
   clean: false,
+  sdkSourcePath: "",
 };
 
 function defaultOutputDir(
@@ -355,7 +359,8 @@ export const useStore = create<State>()(
           outputDir: draft.outputDir,
           clean: draft.clean,
           sdkPath: settings.sdkPath,
-          sdkSourcePath: settings.sdkSourcePath,
+          // Per-recompile override wins; otherwise the global default.
+          sdkSourcePath: draft.sdkSourcePath || settings.sdkSourcePath,
         });
         set((s) => ({
           jobs: { ...s.jobs, [job.id]: job },
