@@ -242,16 +242,11 @@ project_name = "captain_america"
 "0x8279BD88" = {}
 
 [build]
-# Captain America stores DIR.BIN and DATA.* as XCTD-compressed archives. The
-# standard 0.8.0 runtime cannot classify them, so this profile builds the SDK
-# with the upstream magic-header query fix.
-requires_sdk_source = true
-
-[[runtime_patches]]
-id = "xctd-compression-query"
-target = "src/kernel/xboxkrnl/xboxkrnl_io_info.cpp"
-category = "game-runtime"
-required = true
+# Captain America stores DIR.BIN and DATA.* as XCTD-compressed archives, but
+# the stock runtime reads them fine (verified 2026-07-20: full gameplay on
+# the bundled SDK with no patches). The only gap is one tolerated log spam:
+# NtQueryInformationFile(XFileXctdCompressionInformation) unimplemented.
+requires_sdk_source = false
 
 [[sources]]
 from = "src/main.cpp"
